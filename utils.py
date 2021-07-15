@@ -4,7 +4,7 @@ from cycler import cycler# 用于定制线条颜色
 import pandas as pd# 导入DataFrame数据
 import matplotlib.pyplot as plt
 import numpy as np
-import baostock as bs
+
 
 def plotCandle(data,code):   
     # 设置基本参数
@@ -66,83 +66,40 @@ def plotCandle(data,code):
     # 图形绘制
     # show_nontrading:是否显示非交易日，默认False
     # savefig:导出图片，填写文件名及后缀
-#     mpf.plot(data, 
-#         **kwargs, 
-#         style=s, 
-#         show_nontrading=False,
-#         savefig='A_stock-%s_candle_line'
-#          % (code) + '.jpg')
+    # mpf.plot(data,
+    #     **kwargs,
+    #     style=s,
+    #     show_nontrading=False,
+    #     savefig='A_stock-%s_candle_line'
+    #      % (code) + '.jpg')
     mpf.plot(data, 
         **kwargs, 
         style=s, 
         show_nontrading=False)
     
-def getData(code,start_date,end_date):
-    frequency = "d"
-    item_list = "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,isST"
-    rs = bs.query_history_k_data_plus(code,item_list,
-                                      start_date,end_date,
-                                     frequency=frequency)
 
-    #print(",rs.error_code={},rs.error_msg={}".format(rs.error_code,rs.error_msg))
+def plotEarningRatio(ratioList,flagList,data):
+    x = np.arange(len(ratioList))
+    ratio = np.array(ratioList) * 100
+    close = np.array(data['close'])
+    open = np.array(data['open'])
+    #singnal =
 
-    #save data
-    data_list = []
-    while(rs.error_code == "0" ) and rs.next():
-        data_list.append(rs.get_row_data())
-    stock_data = pd.DataFrame(data_list,columns=rs.fields)
-    stock_data.to_csv("./data/{}.csv".format(code))
-    return stock_data
+    fig, (ax1, ax2) = plt.subplots(2, 1)
+    fig.suptitle('test')
+    ax1.grid()
 
-# download data from Internet
-def downloadData(code,start_date,end_date):
-    frequency = "d"
-    item_list = "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,isST"
-    rs = bs.query_history_k_data_plus(code,item_list,
-                                      start_date,end_date,
-                                     frequency=frequency)
+    ax1.plot(x, close, '.-',c="r",label="close")
+    ax1.plot(x, open, '.-',c="g",label="open")
+    ax1.legend()
+    ax1.set_ylabel('close')
 
-    #print(",rs.error_code={},rs.error_msg={}".format(rs.error_code,rs.error_msg))
-
-    #save data
-    data_list = []
-    while(rs.error_code == "0" ) and rs.next():
-        data_list.append(rs.get_row_data())
-    stock_data = pd.DataFrame(data_list,columns=rs.fields)
-    #stock_data.to_csv("./data/{}.csv".format(code))
-    return stock_data
-    
-#把数据处理成k线图的数据结构
-def dataProcess(data):
-    #data = pd.read_csv(csvfile)
-    daily = {}
-    daily["Date"] = data["date"]
-    daily["Open"] = data["open"]
-    daily["High"] = data["high"]
-    daily["Low"] = data["low"]
-    daily["Close"] = data["close"]
-    daily["Volume"] = data["volume"]
-
-    d = pd.DataFrame(daily)
-    d['Date'] = pd.to_datetime(daily['Date'])
-    d.set_index(['Date'],inplace=True)
-    return d
-
-def readData(csvfile):
-    data = pd.read_csv(csvfile)
-    daily = {}
-    daily["Date"] = data["date"]
-    daily["Open"] = data["open"]
-    daily["High"] = data["high"]
-    daily["Low"] = data["low"]
-    daily["Close"] = data["close"]
-    daily["Volume"] = data["volume"]
-
-    d = pd.DataFrame(daily)
-    d['Date'] = pd.to_datetime(daily['Date'])
-    d.set_index(['Date'],inplace=True)
-    return d
-
+    ax2.grid()
+    ax2.plot(x, ratio, '.-',c='g')
+    ax2.set_xlabel('time (d)')
+    ax2.set_ylabel('ratio')
+    #plt.legend()
+    plt.show()
 
 
 def plotMyMomentDot(flg_l, close_p):
@@ -159,8 +116,6 @@ def plotMyMomentDot(flg_l, close_p):
         plt.scatter(i,close_p[i],marker=mark,c=color)
     plt.show()
     
-
-
 
 def MA(data,days:int):
     ma = [x for x in data["close"][:days]]

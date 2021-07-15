@@ -55,12 +55,12 @@ def getNormalData(data):
     """
     daily = {}
     daily["date"] = data["date"]
-    daily["open"] = float(data["open"])
-    daily["high"] = float(data["high"])
-    daily["low"] = float(data["low"])
-    daily["close"] = float(data["close"])
-    daily["volume"] = float(data["volume"])
-    daily["amount"] = float(data["amount"])
+    daily["open"] = data["open"]
+    daily["high"] = data["high"]
+    daily["low"] = data["low"]
+    daily["close"] = data["close"]
+    daily["volume"] = data["volume"]
+    daily["amount"] = data["amount"]
 
 
     d = pd.DataFrame(daily)

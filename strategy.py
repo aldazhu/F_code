@@ -6,13 +6,15 @@ import numpy as np
 def MAStrategy(data:"pandas frame",days:int):
     """"
     收盘价连续两天在均线上则买入，连续两天在均线下则卖出
+    flag主要用于回测，所以flag应该是前面的数据计算的结果，
+    今天的操作应该根据flag来进行，flag=1，则开盘买入，flag=-1，开盘卖出
     """
     flagList = np.zeros(len(data['open']))
     ma = utils.MA(data,days)
     for i in range(2,len(flagList)):
-        if data['close'][i]>ma[i] and data['close'][i-1]>ma[i-1]:
+        if data['close'][i-1]>ma[i-1] and data['close'][i-2]>ma[i-2]:
             flagList[i] = 1
-        elif data['close'][i]<ma[i] and data['close'][i-1]<ma[i-1]:
+        elif data['close'][i-1]<ma[i-1] and data['close'][i-2]<ma[i-2]:
             flagList[i] = -1
     return flagList
 
