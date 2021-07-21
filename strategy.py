@@ -69,12 +69,37 @@ def myMomentDot2(data):
         for j in range(3):
             if data["close"][i - j - 1] > data["close"][i - j - 2]:
                 moment += 1
-        if moment == 3 or (float(data["open"][i - 1]) - float(data["close"][i - 1])) / float(data["open"][i - 1]) > 0.03:
+        if moment == 3 :
             flagList[i] = 1
-        elif moment == 0:
+        elif moment == 0 or (float(data["open"][i - 1]) - float(data["close"][i - 1])) / float(data["open"][i - 1]) > 0.03:
             flagList[i] = -1
 
     return flagList
 
 
+def doubleMA(data,fastMADays=5,slowMADays=15):
+    fastMA = utils.MA(data,fastMADays)
+    slowMA = utils.MA(data,slowMADays)
 
+    flagList = np.zeros(len(data['open']))
+
+    for i in range(slowMADays,len(data['open'])):
+        if fastMA[i-2]<slowMA[i-2] and fastMA[i-1]>slowMA[i-1]:
+            flagList[i] = 1
+        elif fastMA[i-2]>slowMA[i-2] and fastMA[i-1]<slowMA[i-1]:
+            flagList[i] = -1
+
+    return flagList
+
+def upupgo(data):
+    flagList = np.zeros(len(data['open']))
+    for i in range(5, len(data['open'])):
+        flg=0
+        for j in range(3):
+            if data['open'][i-j-1] > data['close'][i-j-1]:
+                flg+=1
+        if flg==3:
+            flagList[i] = 1
+        elif flg<=0:
+            flagList[i] = -1
+    return flagList
