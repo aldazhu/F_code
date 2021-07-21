@@ -72,3 +72,33 @@ def getNormalData(data):
 def readData(filePath:"csv file path"):
     data = pd.read_csv(filePath)
     return data
+
+def downloadHS300(folder:str,startDate:str,endDate:str,frequency:str="d"):
+    # 登录baostock
+    lg = bs.login()
+    print("login respond: lg.error_code={},lg.error_msg={}"
+          .format(lg.error_code, lg.error_msg))
+
+    # 获取沪深300成分股
+    rs = bs.query_hs300_stocks()
+    print('query_hs300 error_code:' + rs.error_code)
+    print('query_hs300  error_msg:' + rs.error_msg)
+    # 打印结果集
+    hs300_stocks = []
+    while (rs.error_code == '0') & rs.next():
+        # 获取一条记录，将记录合并在一起
+        hs300_stocks.append(rs.get_row_data())
+    result = pd.DataFrame(hs300_stocks, columns=rs.fields)
+
+    itemList = "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,isST"
+    for stockCode in result["code"]:
+
+        rs = bs.query_history_k_data_plus(stockCode, itemList,
+                                          startDate, endDate,
+                                          frequency=frequency)
+
+        dataList = []
+        while (rs.error_code == "0") and rs.next():
+            dataList.append(rs.get_row_data())
+        stockData = pd.DataFrame(dataList, columns=rs.fields)
+        stockData.to_csv(folder + "/{}.csv".format(stockCode))

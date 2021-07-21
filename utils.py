@@ -122,3 +122,11 @@ def MA(data,days:int):
     for i in range(days,len(data["close"])):
         ma.append(sum(data["close"][i-days:i])/days)
     return ma
+
+def plotHist(datalist):
+    np.array(datalist)
+    plt.grid()
+    plt.xlabel("chg")
+    plt.ylabel("p")
+    plt.hist(datalist)
+    plt.show()
