@@ -130,3 +130,19 @@ def plotHist(datalist):
     plt.ylabel("p")
     plt.hist(datalist)
     plt.show()
+
+
+def covariance(data1,data2):
+    #calcute the covariance of the two stock
+    #cov(x,y) = E[(x - X_)*(y - y_)],x_=x.mean
+
+    #Pearson correlation coefficient :
+    #coe(x,y) =  cov(x,y)/(d(x)*d(y)),d(x)= standard deviation of x
+    # x = data1['open'] - data1['close']
+    # y = data2['open'] - data2['close']
+    x = data1['pctChg']
+    y = data2['pctChg']
+    # x = pd.DataFrame(x)
+    # y = pd.DataFrame(y)
+    cov = x.corr(y)
+    return cov
