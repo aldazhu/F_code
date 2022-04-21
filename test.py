@@ -42,3 +42,9 @@ def test(flagList,data):
         accRatio[i] = accRatio[i-1] + dayRatio[i]
 
     return accRatio,changePercent
+
+def testPool(data_list:"list of pandas frame ", flag_List):
+    """
+    批量测试
+    """
+

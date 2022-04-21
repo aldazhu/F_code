@@ -2,6 +2,7 @@
 # importlib.reload(utils)
 import utils
 import numpy as np
+import indicator
 
 def upMATwoDays(data:"pandas frame",days:int):
     """"
@@ -10,7 +11,7 @@ def upMATwoDays(data:"pandas frame",days:int):
     今天的操作应该根据flag来进行，flag=1，则开盘买入，flag=-1，开盘卖出
     """
     flagList = np.zeros(len(data['open']))
-    ma = utils.MA(data,days)
+    ma = indicator.MA(data,days)
     for i in range(2,len(flagList)):
         if data['close'][i-1]>ma[i-1] and data['close'][i-2]>ma[i-2]:
             flagList[i] = 1
@@ -27,7 +28,7 @@ def MATrend(data:"pandas frame",days:int):
     """
     thresh = -0.03#控制当天下跌
     flagList = np.zeros(len(data['open']))
-    ma = utils.MA(data,days)
+    ma = indicator.MA(data,days)
     for i in range(2,len(flagList)):
         #是否连续两天在ma上
         upMATwoDays_flag = data['close'][i-1]>ma[i-1] and data['close'][i-2]>ma[i-2]
@@ -42,6 +43,31 @@ def MATrend(data:"pandas frame",days:int):
         if  upMATwoDays_flag and MATrend_up :
             flagList[i] = 1
         elif  downMATwoDays_flag or MATrend_down :
+            flagList[i] = -1
+    return flagList
+
+def upMA(data:"pandas frame",days:int):
+    """"
+    收盘在ma上连续两天，buy
+    收盘在ma下连续两天，sell
+    flag主要用于回测，所以flag应该是前面的数据计算的结果，
+    今天的操作应该根据flag来进行，flag=1，则开盘买入，flag=-1，开盘卖出
+    """
+    thresh = -0.03#控制当天下跌
+    flagList = np.zeros(len(data['open']))
+    ma = indicator.MA(data,days)
+    for i in range(2,len(flagList)):
+        #是否连续两天在ma上
+        upMATwoDays_flag = data['close'][i-1]>ma[i-1] and data['close'][i-2]>ma[i-2]
+
+        #是否连续两天在ma下
+        downMATwoDays_flag = (data['close'][i - 1] < ma[i - 1] and data['close'][i - 2] < ma[i - 2])
+
+        #当日下跌是否超过阈值
+        chg_flg  = (data['close'][i - 1] - data['open'][i - 1]) / data['open'][i - 1] <= thresh
+        if  upMATwoDays_flag  :
+            flagList[i] = 1
+        elif  downMATwoDays_flag  :
             flagList[i] = -1
     return flagList
 
@@ -108,8 +134,8 @@ def delmyMomentDot2(d):
     return flg_l
 
 def doubleMA(data,fastMADays=5,slowMADays=15):
-    fastMA = utils.MA(data,fastMADays)
-    slowMA = utils.MA(data,slowMADays)
+    fastMA = indicator.MA(data,fastMADays)
+    slowMA = indicator.MA(data,slowMADays)
 
     flagList = np.zeros(len(data['open']))
 
@@ -122,6 +148,9 @@ def doubleMA(data,fastMADays=5,slowMADays=15):
     return flagList
 
 def upupgo(data):
+    '''
+
+    '''
     flagList = np.zeros(len(data['open']))
     for i in range(5, len(data['open'])):
         flg=0
@@ -132,4 +161,18 @@ def upupgo(data):
             flagList[i] = 1
         elif flg==0:
             flagList[i] = -1
+    return flagList
+
+
+def CCIThresh(data, days=5,CCI_thresh = 100, after_Ndays=10):
+    """
+    当CCI<-100 buy,after N days sell, CCI > 100 sell
+    """
+    CCI = indicator.CCI(data,days)
+    flagList_buy = np.where(CCI < -CCI_thresh, 1, 0)
+    flagList_sell = 0 - np.where(CCI > CCI_thresh,-1, 0)
+    flagList = flagList_buy + flagList_sell
+    for i in range(days,len(flagList)-after_Ndays):
+        if flagList[i] == 1:
+            flagList[i+after_Ndays] = -1
     return flagList

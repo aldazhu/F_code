@@ -98,6 +98,16 @@ def plotEarningRatio(ratioList,flagList,data):
     ax2.plot(x, ratio, '.-',c='g')
     ax2.set_xlabel('time (d)')
     ax2.set_ylabel('ratio')
+
+    for i in range(len(flagList) - 3):
+        if flagList[i] == 1 :
+            ax2.scatter(i, ratio[i], marker="v", c="r")
+        elif flagList[i] == -1:
+            ax2.scatter(i, ratio[i], marker="*", c="b")
+        # elif flagList[i] == 0:
+        #     # mark = "."
+        #     # color = "b"
+
     #plt.legend()
     plt.show()
 
@@ -106,22 +116,15 @@ def plotMyMomentDot(flg_l, close_p):
     for i in range(len(flg_l) - 3):
         if flg_l[i] == 1 :
             mark = "v"
-            color = "r"
+            color = "red"
         elif flg_l[i] == -1:
             mark = "d"
-            color = "g"
-        elif flg_l[i] == 0:
-            mark = "."
-            color = "b"
+            color = "blue"
         plt.scatter(i,close_p[i],marker=mark,c=color)
     plt.show()
     
 
-def MA(data,days:int):
-    ma = [x for x in data["close"][:days]]
-    for i in range(days,len(data["close"])):
-        ma.append(sum(data["close"][i-days:i])/days)
-    return ma
+
 
 def plotHist(datalist):
     np.array(datalist)
@@ -146,3 +149,5 @@ def covariance(data1,data2):
     # y = pd.DataFrame(y)
     cov = x.corr(y)
     return cov
+
+

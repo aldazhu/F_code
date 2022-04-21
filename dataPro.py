@@ -1,6 +1,7 @@
 import baostock as bs
 import pandas as pd
 import os
+import numpy as np
 
 # download data from Internet
 def downloadData(stockCode:str,startDate:str,endDate:str,frequency:str="d"):
@@ -62,7 +63,6 @@ def getNormalData(data):
     daily["volume"] = data["volume"]
     daily["amount"] = data["amount"]
 
-
     d = pd.DataFrame(daily)
     d['date'] = pd.to_datetime(daily['date'])# use date as the index
     d.set_index(['date'],inplace=True)
@@ -74,6 +74,10 @@ def readData(filePath:"csv file path"):
     return data
 
 def downloadHS300(folder:str,startDate:str,endDate:str,frequency:str="d"):
+
+    if not os.path.isdir(folder):
+        print(f"makedirs:{folder}")
+        os.makedirs(folder)
     # 登录baostock
     lg = bs.login()
     print("login respond: lg.error_code={},lg.error_msg={}"
@@ -101,4 +105,52 @@ def downloadHS300(folder:str,startDate:str,endDate:str,frequency:str="d"):
         while (rs.error_code == "0") and rs.next():
             dataList.append(rs.get_row_data())
         stockData = pd.DataFrame(dataList, columns=rs.fields)
-        stockData.to_csv(folder + "/{}.csv".format(stockCode))
+        savePath = folder + "/{}.csv".format(stockCode)
+        stockData.to_csv(savePath)
+        print(savePath)
+
+
+class dataPro():
+    def __init__(self):
+        self.data = []
+        pass
+
+    def readData(self,csvFilePath):
+        self.data = pd.read_csv(csvFilePath)
+        return self.data
+
+    def getBatchData(self, dateIndex, preDays=5, futureDays = 1):
+        '''
+        功能描述：
+        @dateIndex 提取dataIndex前面的preDays的数据做特征，不包含datIndex天的数据
+        @preDays   获取dateIndex前面的preDays天的数据，这样方便预测未来的结果
+        '''
+        dataLen = len(self.data["open"])
+        x = []
+        y = (self.data['close'][dateIndex-1 + futureDays] - self.data['close'][dateIndex-1])/self.data['close'][dateIndex-1]
+        for i in range(preDays):
+            x.insert(0,self.data['open'][dateIndex -1 - i])
+            x.insert(0,self.data['close'][dateIndex -1 - i])
+            x.insert(0,self.data['high'][dateIndex -1 - i])
+            x.insert(0,self.data['low'][dateIndex -1 - i])
+            x.insert(0,self.data['close'][dateIndex -1 - i] - self.data['open'][dateIndex -1 - i])
+            x.insert(0,np.log10(self.data['amount'][dateIndex -1 - i]))
+            x.insert(0,self.data['turn'][dateIndex -1 - i])
+        return np.array(x),np.array(y*100)
+
+    def getHistoryData(self,startDate, endDate,preDays=5, futureDays=1):
+        _x = []
+        _y = []
+        for i in range(startDate,endDate):
+            x,y = self.getBatchData(i,preDays,futureDays)
+            _x.insert(0,x)
+            _y.insert(0,y)
+        return np.array(_x),np.array(_y)
+
+
+if __name__ == "__main__":
+    saveFolder = r"./data_22"
+
+    startDate = "2017-01-01"
+    endDate = "2022-04-20"
+    downloadHS300(saveFolder, startDate, endDate)
