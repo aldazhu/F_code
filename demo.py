@@ -13,7 +13,7 @@ def testMA(file,startDate,endDate,MAdays=5):
     data = dp.getNormalData(data)
     flagList = sg.upMATwoDays(data,MAdays)
     earningList,changePercent = test.test(flagList,data)
-    print("changePercent:",changePercent)
+    print("MA changePercent:",changePercent)
     #utils.plotEarningRatio(earningList,flagList,data)
     return earningList[-1]
 
@@ -24,7 +24,7 @@ def testMATrend(file,startDate,endDate,MAdays=5):
     data = dp.getNormalData(data)
     flagList = sg.MATrend(data,MAdays)
     earningList,changePercent = test.test(flagList,data)
-    print("changePercent:",changePercent)
+    print("MAThread changePercent:",changePercent)
     #utils.plotEarningRatio(earningList,flagList,data)
     return earningList[-1]
 
@@ -35,7 +35,7 @@ def testUpMA(file,startDate,endDate,MAdays=5):
     data = dp.getNormalData(data)
     flagList = sg.upMA(data,MAdays)
     earningList,changePercent = test.test(flagList,data)
-    print("changePercent:",changePercent)
+    print("upMa changePercent:",changePercent)
     #utils.plotEarningRatio(earningList,flagList,data)
     return earningList[-1]
 
@@ -45,7 +45,7 @@ def testMoment(file,startDate,endDate):
     data = dp.getNormalData(data)
     flagList = sg.myMomentDot2(data)
     earningList,changePercent = test.test(flagList,data)
-    print("changePercent:",changePercent)
+    print("Moment changePercent:",changePercent)
     #utils.plotEarningRatio(earningList,flagList,data)
     return earningList[-1]
 
@@ -55,7 +55,7 @@ def testDoubleMA(file,startDate,endDate,fastMADays=5,slowMADays=15):
     data = dp.getNormalData(data)
     flagList = sg.doubleMA(data,fastMADays,slowMADays)
     earningList,changePercent = test.test(flagList,data)
-    print("changePercent:",changePercent)
+    print("double MA changePercent:",changePercent)
     #utils.plotEarningRatio(earningList,flagList,data)
     return earningList[-1]
 
@@ -65,7 +65,7 @@ def testUpupGo(file,startDate,endDate):
     data = dp.getNormalData(data)
     flagList = sg.upupgo(data)
     earningList,changePercent = test.test(flagList,data)
-    print("changePercent:",changePercent)
+    print("up up go changePercent:",changePercent)
     #utils.plotEarningRatio(earningList,flagList,data)
     return earningList[-1]
 
@@ -89,7 +89,7 @@ def testGroup(file,startDate,endDate):
             flagList[i] = -1
 
     earningList, changePercent = test.test(flagList, data)
-    print("changePercent:", changePercent)
+    print("group changePercent:", changePercent)
     #utils.plotEarningRatio(earningList[:100],flagList[:100],data[:100])
     return earningList[-1]
 
@@ -99,7 +99,7 @@ def testdel(file,startDate,endDate):
     data = dp.getNormalData(data)
     flagList = sg.delmyMomentDot2(data)
     earningList, changePercent = test.test(flagList, data)
-    print("changePercent:", changePercent)
+    print("del changePercent:", changePercent)
     # utils.plotEarningRatio(earningList,flagList,data)
 
     return earningList[-1]
@@ -130,7 +130,7 @@ def testSvm(file):
     svmp = dsg.svmPredict(data)
     flagList = svmp.getFlags()
     earningList, changePercent = test.test(flagList, data)
-    print("changePercent:", changePercent)
+    print("SVM changePercent:", changePercent)
     # utils.plotEarningRatio(earningList,flagList,data)
     return earningList[-1]
 
@@ -142,15 +142,15 @@ def testCCI(file,startDate,endDate,days=5,CCI_thresh=100,after_Ndays=20):
     data = dp.getNormalData(data)
     flagList = sg.CCIThresh(data,days,CCI_thresh,after_Ndays)
     earningList, changePercent = test.test(flagList, data)
-    print("changePercent:", changePercent)
+    print("CCI changePercent:", changePercent)
     # utils.plotEarningRatio(earningList,flagList,data)
     return earningList[-1]
 
 
 def demo_testHS300():
     folder = "./data"
-    startDate = "2020-01-01"
-    endDate = "2021-01-01"
+    startDate = "2021-11-01"
+    endDate = "2022-10-01"
     i = 0
     chg_list = []
     for item in os.listdir(folder):
@@ -177,22 +177,18 @@ def demo_testHS300():
     utils.plotHist(chg_list)
 
 def demo_testOneStock():
-    filePath = "./data/sz.002773.csv"
+    filePath = "./data/sz.399300.csv"
     startDate = "2020-01-01"
-    endDate = "2021-01-01"
+    endDate = "2023-01-01"
     chg = testGroup(filePath, startDate, endDate)
+    chg = testMA(filePath, startDate, endDate)
+    chg = testMATrend(filePath, startDate, endDate,15)
+    chg = testUpMA(filePath, startDate, endDate,10)
+    chg = testMoment(filePath, startDate, endDate)
+    chg = testDoubleMA(filePath,startDate,endDate,fastMADays=7,slowMADays=14)
 
 #github的tocken ：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
 if __name__ == "__main__":
-    #demo_testOneStock()
-    demo_testHS300()
-
-
-#
-# if __name__ == "__main__":
-#     startDate = "2016-01-01"
-#     endDate = "2021-07-01"
-#     folder = "./data"
-#     dp.downloadHS300(folder,startDate,endDate)
-
+    demo_testOneStock()
+    # demo_testHS300()
 

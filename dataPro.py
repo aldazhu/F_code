@@ -39,7 +39,7 @@ def saveData(data:"pandas frame",folder:"./data", stockCode:"sh.600001"):
     None
     """
 
-    savePath = os.path.join(folder,""+".csv")
+    savePath = os.path.join(folder,stockCode+".csv")
     data.to_csv(savePath)
     return 
 
@@ -148,9 +148,23 @@ class dataPro():
         return np.array(_x),np.array(_y)
 
 
-if __name__ == "__main__":
-    saveFolder = r"./data_22"
+def downloadDataDemo():
+    saveFolder = r"data"
 
-    startDate = "2017-01-01"
-    endDate = "2022-04-20"
+    startDate = "2021-12-31"
+    endDate = "2022-12-25"
+    code = "sz.399300" # 沪深300指数
+    data = downloadData(code,startDate,endDate)
+    saveData(data,saveFolder,code)
+
+def downloadHS300Demo():
+    saveFolder = r"./data"
+
+    startDate = "2021-12-31"
+    endDate = "2022-12-25"
     downloadHS300(saveFolder, startDate, endDate)
+    
+
+if __name__ == "__main__":
+    downloadDataDemo()
+    # downloadHS300Demo()
