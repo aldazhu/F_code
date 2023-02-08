@@ -243,10 +243,22 @@ class stockCluster():
         edge_colors[:] = "b"
         edge_colors[colors_bool] = "r"
 
-
+        plt.grid(True)
+        # 画蜡烛图
         plt.bar(dates, (closes - opens), 0.8, bottom=opens, color=colors,edgecolor=edge_colors, zorder=3)
         plt.vlines(dates, lows, highs, color=edge_colors)
+
+        # 画y
+        datey = np.array([self.preDays_+self.featureDays_])
+        preclose = sample[-3] # 样本最后一天的收盘价
+        if y >= 0:
+            colory = "r"
+        else:
+            colory = "b"
+        plt.bar(datey,y,0.8,bottom=preclose,color=colory,edgecolor=colory,zorder=3)
+
         plt.show()
+        plt.savefig(f"temp/pre{self.preDays_}_feat{self.featureDays_}.png")
 
 
     
