@@ -216,7 +216,7 @@ class stockCluster():
             Y.append(y_i_array)
         return X,Y
 
-    def drawOneSample(self,sample,y):
+    def drawOneSample(self,sample,y,if_save=False,save_path=""):
         """sample preDays天的（开盘价，最高价，最低价，收盘价，交易股数，换手率）组成的样本，
         [day1_open,day1_high, day1_low,...,day2_open,day2_high,day2_low,...,day5_open,...]
 
@@ -257,12 +257,14 @@ class stockCluster():
             colory = "b"
         plt.bar(datey,y,0.8,bottom=preclose,color=colory,edgecolor=colory,zorder=3)
 
-        plt.show()
-        plt.savefig(f"temp/pre{self.preDays_}_feat{self.featureDays_}.png")
-
-
-    
-
+        if if_save:
+            if not save_path == "":
+                print(f"save image to {save_path}")
+                plt.savefig(save_path)
+        else:
+            plt.show()
+        
+        plt.clf()
 
 def downloadDataDemo():
     saveFolder = r"data"
@@ -282,13 +284,23 @@ def downloadHS300Demo():
     
 
 def clusterDemo():
+    src_root = r"./data"
     csv_file_path = r"./data/sh.600000.csv"
 
     preDays = 5
     featureDays = 5
     tool = stockCluster(preDays,featureDays)
-    X,Y = tool.getShiftData(csv_file_path)
-    tool.drawOneSample(X[0],Y[0])
+    image_num = 0
+    for csv_name in os.listdir(src_root):
+        csv_file_path = os.path.join(src_root,csv_name)
+        print(f"Find {csv_file_path}")
+        if not os.path.isfile(csv_file_path):
+            continue
+        X,Y = tool.getShiftData(csv_file_path)
+        for i in range(len(X)):
+            image_num += 1
+            image_save_path = f"temp/{str(image_num)}_pre{preDays}_feat{featureDays}.png"
+            tool.drawOneSample(X[i],Y[i],True,image_save_path)
 
 
 if __name__ == "__main__":
