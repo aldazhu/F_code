@@ -283,7 +283,7 @@ def downloadHS300Demo():
     downloadHS300(saveFolder, startDate, endDate)
     
 
-def clusterDemo():
+def clusterDrawDemo():
     src_root = r"./data"
     csv_file_path = r"./data/sh.600000.csv"
 
@@ -302,9 +302,158 @@ def clusterDemo():
             image_save_path = f"temp/{str(image_num)}_pre{preDays}_feat{featureDays}.png"
             tool.drawOneSample(X[i],Y[i],True,image_save_path)
 
+def clusterSaveSampleDemo():
+    src_root = r"./data"
+    
+    sample_save_path = r"G:\pydoc\sample"
+    if not os.path.isdir(sample_save_path):
+        os.makedirs(sample_save_path)
+
+    preDays = 5
+    featureDays = 5
+    tool = stockCluster(preDays,featureDays)
+    save_x = []
+    save_y = []
+    for csv_name in os.listdir(src_root):
+        csv_file_path = os.path.join(src_root,csv_name)
+        print(f"Find {csv_file_path}")
+        if not os.path.isfile(csv_file_path):
+            continue
+        X,Y = tool.getShiftData(csv_file_path)
+        save_x.extend(X)
+        save_y.extend(Y)
+    save_x = np.array(save_x)
+    save_y = np.array(save_y)
+    np.save(f"{sample_save_path}\\samples.npy",save_x)
+    np.save(f"{sample_save_path}\\labels.npy",save_y)
+
+
+class ClusterSamples():
+    def __init__(self,cluster_num,run_times):
+        """_summary_
+
+        Args:
+            cluster_num (int): 聚类中心数目
+            run_times (int): 迭代次数
+        """
+        pass
+        self.k = cluster_num
+        self.times = run_times
+        
+    
+    def loadSamples(self,samples_path,labels_path):
+        """输入numpy保存的样本和标签路径读取样本和标签
+
+        Args:
+            samples_path (str): _description_
+            labels_path (_type_): _description_
+        """
+        X = np.load(samples_path,allow_pickle=True)
+        Y = np.load(labels_path,allow_pickle=True)
+        return X,Y
+
+    def cluster(self,X,centers):
+        """聚类
+
+        Args:
+            X (_type_): 数据样本，
+            labels (): X的类别
+            centers (_type_): 聚类中心
+        """
+        labels = []
+        for i in range(len(X)):
+            min_distance = 99999999999999
+            label = 0
+            for j in range(len(centers)): # 找到离x[i]最近的中心
+                distance = np.sum((centers[j] - X[i])**2)
+                if distance < min_distance:
+                    label = j
+                    min_distance = distance
+            labels.append(label)
+        return labels
+    
+    def update(self,X,labels):
+        """根据labels重新计算聚类中心
+
+        Args:
+            X (_type_): _description_
+            labels (_type_): _description_
+        """
+        assert(len(X) == len(labels))
+        centers_dict = {} # item 是 label:[X[i],num]
+        for i in range(len(X)):
+            if labels[i] in centers_dict:
+                centers_dict[labels[i]][0] += X[i]
+                centers_dict[labels[i]][1] += 1
+            else:
+                centers_dict[labels[i]] = [X[i],1]
+        
+        centers = []
+        for item in centers_dict.items():
+            center = item[1][0] / item[1][1] 
+            centers.append(center)
+        return centers
+    
+    def initialize(self,X):
+        """初始化聚类中心
+
+        Args:
+            X (_type_): _description_
+        """
+        step = len(X) // self.k # 向下取整
+        centers = []
+        for i in range(0,len(X),step):
+            centers.append(X[i])
+        return centers
+
+ 
+    def run(self,X):
+        centers = self.initialize(X)
+        for t in range(self.times):
+            labels = self.cluster(X,centers)
+            centers = self.update(X,labels)
+        return X,labels,centers
+        
+    def save(self,X,labels,centers):
+        """_summary_
+
+        Args:
+            X (_type_): _description_
+            labels (_type_): _description_
+            centers (_type_): _description_
+        """
+        pass
+
+def DemoOfCluster():
+    samples_path = r"G:\pydoc\F_code\F_code\sample\samples.npy"
+    labels_path = r"G:\pydoc\F_code\F_code\sample\labels.npy"
+    save_root = r"G:\pydoc\F_code\F_code\temp"
+    iter_num = 50
+    cluster_num = 50
+    solu = ClusterSamples(cluster_num,iter_num)
+    X,Y = solu.loadSamples(samples_path,labels_path)
+    X,labels,centers = solu.run(X)
+    
+    # 保存数据
+    preDays = 5
+    featureDays = 5
+    tool = stockCluster(preDays,featureDays)
+    image_num = 0
+    for i in range(len(X)):
+        image_num += 1
+        image_save_folder = os.path.join(save_root,str(labels[i]))
+        if not os.path.isdir(image_save_folder):
+            os.makedirs(image_save_folder)
+
+        image_save_path =os.path.join(image_save_folder,f"{str(image_num)}_pre{preDays}_feat{featureDays}.png") 
+        tool.drawOneSample(X[i],Y[i],True,image_save_path)
+
+
 
 if __name__ == "__main__":
     pass
-    clusterDemo()
+    # clusterDrawDemo()
+    # clusterSaveSampleDemo()
     # downloadDataDemo()
     # downloadHS300Demo()
+    DemoOfCluster()
