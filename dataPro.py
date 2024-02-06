@@ -20,7 +20,7 @@ def downloadData(stockCode:str,startDate:str,endDate:str,frequency:str="d"):
     lg = bs.login()
     print("login respond: lg.error_code={},lg.error_msg={}"
       .format(lg.error_code,lg.error_msg))
-    itemList = "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,isST"
+    itemList = "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,peTTm,pbMRQ,psTTM,pcfNcfTTM,isST"
     rs = bs.query_history_k_data_plus(stockCode,itemList,
                                       startDate,endDate,
                                      frequency=frequency)
@@ -110,6 +110,38 @@ def downloadHS300(folder:str,startDate:str,endDate:str,frequency:str="d"):
         stockData.to_csv(savePath)
         print(savePath)
 
+
+def get_hs300_profit_data(folder:str,startDate:str,endDate:str):
+    """
+    get the profit of hs300
+
+    input paramters:
+    folder : the folder of the stock data
+    startDate : the start date of the data
+    endDate : the end date of the data
+
+    output paramters:
+    profit : the profit of the hs300
+    """
+    # 登录baostock
+    lg = bs.login()
+    print("login respond: lg.error_code={},lg.error_msg={}"
+          .format(lg.error_code, lg.error_msg))
+
+    # 获取沪深300成分股
+    rs = bs.query_hs300_stocks()
+    print('query_hs300 error_code:' + rs.error_code)
+    print('query_hs300  error_msg:' + rs.error_msg)
+    # 打印结果集
+    hs300_stocks = []
+    while (rs.error_code == '0') & rs.next():
+        # 获取一条记录，将记录合并在一起
+        hs300_stocks.append(rs.get_row_data())
+    for stock in hs300_stocks:
+        rs = bs.query_profit_data(code=stock[1], year=2021, quarter=3)
+
+    
+    return 
 
 class dataPro():
     def __init__(self):
@@ -278,7 +310,7 @@ def downloadDataDemo():
 def downloadHS300Demo():
     saveFolder = r"./data"
 
-    startDate = "2020-01-01"
+    startDate = "2022-01-01"
     endDate = "2024-02-05"
     downloadHS300(saveFolder, startDate, endDate)
     
@@ -478,5 +510,5 @@ if __name__ == "__main__":
     # clusterDrawDemo()
     # clusterSaveSampleDemo()
     # downloadDataDemo()
-    # downloadHS300Demo()
-    DemoOfCluster()
+    downloadHS300Demo()
+    # DemoOfCluster()

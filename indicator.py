@@ -34,3 +34,23 @@ def CCI(data,days:int):
     CCI = (M - A) / (0.015 * D)#list不能直接做运算
     CCI[:days] = 0 #
     return CCI
+
+def RSI(data,days:int):
+    '''
+    RSI = total Gain / (total Loss + total Gain)
+    
+    RS = total Gain / total Loss
+    RSI = 100 - 100 / (1 + RS)
+    '''
+    #RSI = [0 for i in range(days)]
+    gain = [0 for i in range(days)]
+    loss = [0 for i in range(days)]
+    for i in range(days,len(data['close'])):
+        gain.append(sum([data['close'][i]-data['close'][i-1] for i in range(i-days,i) if data['close'][i]-data['close'][i-1]>0]))
+        loss.append(sum([data['close'][i]-data['close'][i-1] for i in range(i-days,i) if data['close'][i]-data['close'][i-1]<0]))
+    gain = np.array(gain)
+    loss = np.array(loss)
+    RS = gain/abs(loss+1e-6)
+    RSI = 100 - 100 / (1 + RS)
+    RSI[:days] = 50
+    return RSI
