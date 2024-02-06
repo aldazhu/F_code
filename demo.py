@@ -149,8 +149,8 @@ def testCCI(file,startDate,endDate,days=5,CCI_thresh=100,after_Ndays=20):
 
 def demo_testHS300():
     folder = "./data"
-    startDate = "2021-11-01"
-    endDate = "2022-10-01"
+    startDate = "2020-01-01"
+    endDate = "2024-02-05"
     i = 0
     chg_list = []
     for item in os.listdir(folder):
@@ -177,9 +177,9 @@ def demo_testHS300():
     utils.plotHist(chg_list)
 
 def demo_testOneStock():
-    filePath = "./data/sz.399300.csv"
+    filePath = "./data/sh.600000.csv"
     startDate = "2020-01-01"
-    endDate = "2023-01-01"
+    endDate = "2024-02-05"
     chg = testGroup(filePath, startDate, endDate)
     chg = testMA(filePath, startDate, endDate)
     chg = testMATrend(filePath, startDate, endDate,15)
@@ -189,6 +189,6 @@ def demo_testOneStock():
 
 #github的tocken ：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
 if __name__ == "__main__":
-    demo_testOneStock()
-    # demo_testHS300()
+    # demo_testOneStock()
+    demo_testHS300()
 
