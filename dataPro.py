@@ -281,6 +281,12 @@ def downloadHS300Demo():
     startDate = "2021-12-31"
     endDate = "2022-12-25"
     downloadHS300(saveFolder, startDate, endDate)
+
+def downloadZZ1000Demo():
+    save_folder = r"./data/zz1000"
+    start_date = "2020-01-01"
+    end_date = "2023-05-05"
+    downloadData()
     
 
 def clusterDrawDemo():
@@ -360,6 +366,7 @@ class ClusterSamples():
             labels (): X的类别
             centers (_type_): 聚类中心
         """
+        print(f"Clustering \t clusters number: {len(centers)}")
         labels = []
         for i in range(len(X)):
             min_distance = 99999999999999
@@ -379,6 +386,7 @@ class ClusterSamples():
             X (_type_): _description_
             labels (_type_): _description_
         """
+        print("Update the cluster center")
         assert(len(X) == len(labels))
         centers_dict = {} # item 是 label:[X[i],num]
         for i in range(len(X)):
@@ -400,6 +408,7 @@ class ClusterSamples():
         Args:
             X (_type_): _description_
         """
+        print("Initialize the cluster center")
         step = len(X) // self.k # 向下取整
         centers = []
         for i in range(0,len(X),step):
