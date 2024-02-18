@@ -140,9 +140,9 @@ def doubleMA(data,fastMADays=5,slowMADays=15):
     flagList = np.zeros(len(data['open']))
 
     for i in range(slowMADays,len(data['open'])):
-        if fastMA[i-2]<slowMA[i-2] and fastMA[i-1]>slowMA[i-1]:
+        if fastMA[i-1]<slowMA[i-1] and fastMA[i]>slowMA[i]:
             flagList[i] = 1
-        elif fastMA[i-2]>slowMA[i-2] and fastMA[i-1]<slowMA[i-1]:
+        elif fastMA[i-1]>slowMA[i-1] and fastMA[i]<slowMA[i]:
             flagList[i] = -1
 
     return flagList
@@ -176,3 +176,15 @@ def CCIThresh(data, days=5,CCI_thresh = 100, after_Ndays=10):
         if flagList[i] == 1:
             flagList[i+after_Ndays] = -1
     return flagList
+
+def RSIStretegy(data, days=14, high_thresh=70, low_thresh=30):
+    RSI = indicator.RSI(data,days)
+    flagList = np.zeros(len(data['open']))
+
+    for i in range(days, len(data['open'])):
+        if RSI[i-1] > high_thresh and RSI[i] < high_thresh:
+            flagList[i] = -1
+        elif RSI[i-1] < low_thresh and RSI[i] > low_thresh:
+            flagList[i] = 1
+    return flagList
+

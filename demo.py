@@ -77,15 +77,15 @@ def testGroup(file,startDate,endDate):
     flagList_doubleMA = sg.doubleMA(data,7,14)
     flagList_moment = sg.myMomentDot(data)
     flagList_MATwoDays = sg.upMATwoDays(data,10)
-    # flagList_CCI = sg.CCIThresh(data,8,100,10)
+    flagList_CCI = sg.CCIThresh(data,8,100,10)
+    flagList_RSI = sg.RSIStretegy(data, 14, 75, 25)
 
     flagList = np.zeros(len(flagList_upupgo))
 
     for i in range(len(flagList_upupgo)):
-        if flagList_doubleMA[i]==1 or flagList_upupgo[i]==1 or flagList_moment[i]==1 or flagList_MATwoDays[i]==1 \
-                :
+        if flagList_RSI[i]==1 or flagList_CCI[i]==1 or flagList_doubleMA[i]==1:
             flagList[i] = 1
-        elif   flagList_doubleMA[i]==-1 or flagList_moment[i]==-1 :
+        elif   flagList_RSI[i]==-1 or flagList_CCI[i]==-1 or flagList_doubleMA[i]==-1:
             flagList[i] = -1
 
     earningList, changePercent = test.test(flagList, data)
@@ -93,15 +93,16 @@ def testGroup(file,startDate,endDate):
     #utils.plotEarningRatio(earningList[:100],flagList[:100],data[:100])
     return earningList[-1]
 
-def testdel(file,startDate,endDate):
-    # data = dp.downloadData(stockCode,startDate,endDate)
+def test_RSI(file,startDate,endDate):
     data = dp.readData(file)
     data = dp.getNormalData(data)
-    flagList = sg.delmyMomentDot2(data)
+    days = 14
+    high_thresh = 70
+    low_thresh = 30
+    flagList = sg.RSIStretegy(data, days, high_thresh, low_thresh)
     earningList, changePercent = test.test(flagList, data)
-    print("del changePercent:", changePercent)
+    print("RSI changePercent:", changePercent)
     # utils.plotEarningRatio(earningList,flagList,data)
-
     return earningList[-1]
 
 
@@ -149,8 +150,8 @@ def testCCI(file,startDate,endDate,days=5,CCI_thresh=100,after_Ndays=20):
 
 def demo_testHS300():
     folder = "./data"
-    startDate = "2021-11-01"
-    endDate = "2022-10-01"
+    startDate = "2020-01-01"
+    endDate = "2024-02-05"
     i = 0
     chg_list = []
     for item in os.listdir(folder):
@@ -165,6 +166,7 @@ def demo_testHS300():
         # chg = testdel(file,startDate,endDate)
         # chg = testSvm(file)
         # chg = testCCI(file,startDate,endDate,5,-100,10)
+        # chg = test_RSI(file,startDate,endDate)
 
         chg_list.append(chg)
         print("code:{},chg:{}".format(item, chg))
@@ -177,9 +179,9 @@ def demo_testHS300():
     utils.plotHist(chg_list)
 
 def demo_testOneStock():
-    filePath = "./data/sz.399300.csv"
+    filePath = "./data/sh.600000.csv"
     startDate = "2020-01-01"
-    endDate = "2023-01-01"
+    endDate = "2024-02-05"
     chg = testGroup(filePath, startDate, endDate)
     chg = testMA(filePath, startDate, endDate)
     chg = testMATrend(filePath, startDate, endDate,15)
@@ -189,6 +191,6 @@ def demo_testOneStock():
 
 #github的tocken ：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
 if __name__ == "__main__":
-    demo_testOneStock()
-    # demo_testHS300()
+    # demo_testOneStock()
+    demo_testHS300()
 
