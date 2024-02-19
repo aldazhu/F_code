@@ -6,6 +6,8 @@ import utils
 import os
 import numpy as np
 
+from my_logger import logger
+
 def testMA(file,startDate,endDate,MAdays=5):
     #ma均线策略，在ma均线上连续两天
     #data = dp.downloadData(stockCode,startDate,endDate)
@@ -77,17 +79,26 @@ def testGroup(file,startDate,endDate):
     flagList_doubleMA = sg.doubleMA(data,7,14)
     flagList_moment = sg.myMomentDot(data)
     flagList_MATwoDays = sg.upMATwoDays(data,10)
-    flagList_CCI = sg.CCIThresh(data,8,100,10)
-    flagList_RSI = sg.RSIStretegy(data, 14, 75, 25)
+    flagList_CCI = sg.CCIThresh(data,9,90)
+    flagList_RSI = sg.RSIStrategy(data, 9, 70, 30)
+    flagList_OSC = sg.OSCStrategy(data,7,65)
+    # log the flagList for each strategy
+    logger.info("flagList_upupgo: buy num: %s, sell num :%s",np.sum(flagList_upupgo==1),np.sum(flagList_upupgo==-1))
+    logger.info("flagList_doubleMA: buy num: %s, sell num :%s",np.sum(flagList_doubleMA==1),np.sum(flagList_doubleMA==-1))
+    logger.info("flagList_moment: buy num: %s, sell num :%s",np.sum(flagList_moment==1),np.sum(flagList_moment==-1))
+    logger.info("flagList_MATwoDays: buy num: %s, sell num :%s",np.sum(flagList_MATwoDays==1),np.sum(flagList_MATwoDays==-1))
+    logger.info("flagList_CCI: buy num: %s, sell num :%s",np.sum(flagList_CCI==1),np.sum(flagList_CCI==-1))
+    logger.info("flagList_RSI: buy num: %s, sell num :%s",np.sum(flagList_RSI==1),np.sum(flagList_RSI==-1))
+    logger.info("flagList_OSC: buy num: %s, sell num :%s",np.sum(flagList_OSC==1),np.sum(flagList_OSC==-1))
 
     flagList = np.zeros(len(flagList_upupgo))
 
-    for i in range(len(flagList_upupgo)):
-        if flagList_RSI[i]==1 or flagList_CCI[i]==1 or flagList_doubleMA[i]==1:
-            flagList[i] = 1
-        elif   flagList_RSI[i]==-1 or flagList_CCI[i]==-1 or flagList_doubleMA[i]==-1:
-            flagList[i] = -1
+    flagList = flagList_RSI + flagList_doubleMA
+    flagList = np.where(flagList>=1,1,flagList)
+    flagList = np.where(flagList<=-1,-1,flagList)
+    logger.info("final flagList: buy num: %s, sell num :%s",np.sum(flagList==1),np.sum(flagList==-1))
 
+        
     earningList, changePercent = test.test(flagList, data)
     print("group changePercent:", changePercent)
     #utils.plotEarningRatio(earningList[:100],flagList[:100],data[:100])
@@ -99,9 +110,29 @@ def test_RSI(file,startDate,endDate):
     days = 14
     high_thresh = 70
     low_thresh = 30
-    flagList = sg.RSIStretegy(data, days, high_thresh, low_thresh)
+    flagList = sg.RSIStrategy(data, days, high_thresh, low_thresh)
     earningList, changePercent = test.test(flagList, data)
     print("RSI changePercent:", changePercent)
+    # utils.plotEarningRatio(earningList,flagList,data)
+    return earningList[-1]
+
+
+def testOSC(file,startDate,endDate,short=5,long=10):
+    data = dp.readData(file)
+    data = dp.getNormalData(data)
+    flagList = sg.OSCStrategy(data,short,long)
+    earningList, changePercent = test.test(flagList, data)
+    print("OSC changePercent:", changePercent)
+    # utils.plotEarningRatio(earningList,flagList,data)
+    return changePercent
+
+def test_TrendFollowingStrategy(file,startDate,endDate):
+    data = dp.readData(file)
+    data = dp.getNormalData(data)
+    days = 5
+    flagList = sg.TrendFollowingStrategy(data, days)
+    earningList, changePercent = test.test(flagList, data)
+    print("TrendFollowingStrategy changePercent:", changePercent)
     # utils.plotEarningRatio(earningList,flagList,data)
     return earningList[-1]
 
@@ -154,6 +185,8 @@ def demo_testHS300():
     endDate = "2024-02-05"
     i = 0
     chg_list = []
+    stock_code_list = []
+    stock_state_dict = {}
     for item in os.listdir(folder):
         file = os.path.join(folder, item)
         # chg = testMA(file, startDate, endDate)
@@ -167,15 +200,24 @@ def demo_testHS300():
         # chg = testSvm(file)
         # chg = testCCI(file,startDate,endDate,5,-100,10)
         # chg = test_RSI(file,startDate,endDate)
+        # chg = test_TrendFollowingStrategy(file,startDate,endDate)
+        # chg = testOSC(file,startDate,endDate,5,10)
 
         chg_list.append(chg)
+        
         print("code:{},chg:{}".format(item, chg))
+        stock_state_dict[item] = chg
 
         i += 1
         # if i>100:
         #     break
+    for k, v in stock_state_dict.items():
+        print(f"stock code: {k}, change: {v}")
     print("mean:", np.mean(chg_list))
     print("median:", np.median(chg_list))
+    print("standard variance:", np.std(chg_list))
+    print("max:", np.max(chg_list))
+    print("min:", np.min(chg_list))
     utils.plotHist(chg_list)
 
 def demo_testOneStock():
@@ -188,9 +230,19 @@ def demo_testOneStock():
     chg = testUpMA(filePath, startDate, endDate,10)
     chg = testMoment(filePath, startDate, endDate)
     chg = testDoubleMA(filePath,startDate,endDate,fastMADays=7,slowMADays=14)
+    chg = test_TrendFollowingStrategy(filePath,startDate,endDate)
+
+
+def delf():
+    file_path = "./data/sh.600000.csv"
+    data = dp.readData(file_path)
+    data = dp.getNormalData(data)
+    logger.info("date: %s",data['open'][0:1])
+
 
 #github的tocken ：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
 if __name__ == "__main__":
     # demo_testOneStock()
     demo_testHS300()
+    # delf()
 
