@@ -18,6 +18,8 @@ def test(flagList,data):
     dayRatio = np.zeros(len(flagList))
     hold_days = 0
     stop_loss_ratio = -0.08 #止损
+    folow_stop_loss_ratio = -0.08 #跟随止损
+    max_earning = -99999999 
 
     for i in range(1, len(flagList)-1):
         #buy
@@ -25,7 +27,7 @@ def test(flagList,data):
             stockPool = 1
             buyPrice = data['open'][i+1]
             buyNum += 1
-            dayRatio[i] = (data['close'][i] - data['open'][i])/data['open'][i]
+            dayRatio[i] = (data['open'][i] - buyPrice) / buyPrice - tradeFeeRatio
             print("buyPrice:",buyPrice)
         #sell
         if stockPool == 1 and flagList[i] == -1:
@@ -41,7 +43,8 @@ def test(flagList,data):
             dayRatio[i] = (data['close'][i] - data['close'][i-1])/data['close'][i-1]
             hold_days += 1
             gain = (data['close'][i] - buyPrice) / buyPrice
-            if gain < stop_loss_ratio:
+            
+            if  (gain < stop_loss_ratio):
                 sellPrice = data['open'][i+1]
                 stockPool = 0
                 sellNum += 1

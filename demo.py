@@ -43,7 +43,8 @@ def testMoment(file,startDate,endDate):
     #data = dp.downloadData(stockCode,startDate,endDate)
     data = dp.readData(file)
     data = dp.getNormalData(data)
-    flagList = sg.myMomentDot2(data)
+    # flagList = sg.myMomentDot2(data)
+    flagList = sg.delmyMomentDot2(data)
     earningList,changePercent = test.test(flagList,data)
     print("Moment changePercent:",changePercent)
     #utils.plotEarningRatio(earningList,flagList,data)
@@ -78,12 +79,13 @@ def testGroup(file,startDate,endDate):
     flagList_moment = sg.myMomentDot(data)
     flagList_MATwoDays = sg.upMATwoDays(data,10)
     flagList_CCI = sg.CCIThresh(data,8,100,10)
-    flagList_RSI = sg.RSIStretegy(data, 14, 75, 25)
+    flagList_RSI = sg.RSIStretegy(data, 9, 75, 25)
+    flagList_OSC = sg.OSCStretegy(data,7,65)
 
     flagList = np.zeros(len(flagList_upupgo))
 
     for i in range(len(flagList_upupgo)):
-        if flagList_RSI[i]==1 or flagList_CCI[i]==1 or flagList_doubleMA[i]==1:
+        if flagList_RSI[i]==1 or flagList_CCI[i]==1 or flagList_doubleMA[i]==1 or flagList_OSC[i]==1:
             flagList[i] = 1
         elif   flagList_RSI[i]==-1 or flagList_CCI[i]==-1 or flagList_doubleMA[i]==-1:
             flagList[i] = -1
@@ -105,6 +107,39 @@ def test_RSI(file,startDate,endDate):
     # utils.plotEarningRatio(earningList,flagList,data)
     return earningList[-1]
 
+def find_best_OSC():
+   
+    max_earning = 0
+    max_fast = 0
+    max_slow = 0
+    folder = "./data"
+    startDate = "2020-01-01"
+    endDate = "2024-02-05"
+    i = 0
+    chg_list = []
+    
+    for i in range(5, 15, 2):
+        for j in range(15, 75, 5):
+            earning = 0
+            for item in os.listdir(folder):
+                file = os.path.join(folder, item)
+                earning += test_OSC(file,startDate,endDate,i,j)
+            if earning > max_earning:
+                max_earning = earning
+                max_fast = i
+                max_slow = j
+    print("max earning:",max_earning)
+    print("max_fast:",max_fast)
+    print("max_slow:",max_slow)
+
+def test_OSC(file,startDate,endDate,fastMADays=5,slowMADays=15):
+    data = dp.readData(file)
+    data = dp.getNormalData(data)
+    flagList = sg.OSCStretegy(data,fastMADays,slowMADays)
+    earningList,changePercent = test.test(flagList,data)
+    print("OSC changePercent:",changePercent)
+    #utils.plotEarningRatio(earningList,flagList,data)
+    return changePercent
 
 def testCovariance(folder,startDate,endDate):
     #当相关系数比较大时，是不是可以当做同一类
@@ -167,6 +202,7 @@ def demo_testHS300():
         # chg = testSvm(file)
         # chg = testCCI(file,startDate,endDate,5,-100,10)
         # chg = test_RSI(file,startDate,endDate)
+        # chg = test_OSC(file,startDate,endDate,7,20)
 
         chg_list.append(chg)
         print("code:{},chg:{}".format(item, chg))
@@ -193,4 +229,5 @@ def demo_testOneStock():
 if __name__ == "__main__":
     # demo_testOneStock()
     demo_testHS300()
+    # find_best_OSC()
 

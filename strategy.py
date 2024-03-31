@@ -147,6 +147,27 @@ def doubleMA(data,fastMADays=5,slowMADays=15):
 
     return flagList
 
+def OSCStretegy(data,fastMADays=5,slowMADays=15):
+    """OSC: fastMA-slowMA,当OSC>0 且OSC线的斜率大于0则买入；价格震荡指标。
+
+    Args:
+        data (_type_): _description_
+        fastMADays (int, optional): _description_. Defaults to 5.
+        slowMADays (int, optional): _description_. Defaults to 15.
+    """
+    fastMA = indicator.MA(data,fastMADays)
+    slowMA = indicator.MA(data,slowMADays)
+    OSC = np.array(fastMA) - np.array(slowMA)
+    flagList = np.zeros(len(data['open']))
+
+    for i in range(slowMADays,len(data['open'])):
+        if OSC[i-1] > 0 and OSC[i] >= OSC[i-1]:
+            flagList[i] = 1
+        elif OSC[i-1] > 0 and OSC[i] < OSC[i-1]:
+            flagList[i] = -1
+    return flagList
+     
+
 def upupgo(data):
     '''
 
