@@ -23,6 +23,8 @@ def test(flagList,data):
     folow_stop_loss_ratio = -0.08 #跟随止损
     max_earning = -99999999 
 
+    date_list = data.index.tolist()
+
     for i in range(1, len(flagList)-1):
         #buy
         if stockPool == 0 and flagList[i-1] == 1:
@@ -31,7 +33,7 @@ def test(flagList,data):
             buyNum += 1
             dayRatio[i] = (data['close'][i] - data['open'][i+1])/data['open'][i]
             # print("buyPrice:",buyPrice)
-            logger.info("date: %s, buyPrice: %f",date_list[i],buyPrice)
+            logger.info("date: %s, buyPrice: %f",date_list[i], buyPrice)
         #sell
         if stockPool == 1 and flagList[i-1] == -1:
             sellPrice = data['open'][i]
