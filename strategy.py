@@ -191,14 +191,11 @@ def CCIThresh(data, days=5,CCI_thresh = 100, after_Ndays=10):
     """
     CCI = indicator.CCI(data,days)
     flagList_buy = np.where(CCI < -CCI_thresh, 1, 0)
-    flagList_sell = 0 - np.where(CCI > CCI_thresh,-1, 0)
+    flagList_sell = np.where(CCI > CCI_thresh,-1, 0)
     flagList = flagList_buy + flagList_sell
-    for i in range(days,len(flagList)-after_Ndays):
-        if flagList[i] == 1:
-            flagList[i+after_Ndays] = -1
     return flagList
 
-def RSIStretegy(data, days=14, high_thresh=70, low_thresh=30):
+def RSIStrategy(data, days=14, high_thresh=70, low_thresh=30):
     RSI = indicator.RSI(data,days)
     flagList = np.zeros(len(data['open']))
 
@@ -209,3 +206,36 @@ def RSIStretegy(data, days=14, high_thresh=70, low_thresh=30):
             flagList[i] = 1
     return flagList
 
+def OSCStrategy(data,short=12,long=26):
+    """
+    当OSC>0,且OSC线的斜率大于0，buy；OSC<0,且OSC线的斜率小于0，sell
+    """
+    OSC = indicator.OSC(data,short,long)
+    flagList = np.zeros(len(data['open']))
+    for i in range(long,len(data['open'])):
+        if OSC[i] > 0 and OSC[i] >= OSC[i-1]:
+            flagList[i] = 1
+            # 连续上升的时候不一直买
+            while i < len(data['open']) and OSC[i] > 0 and OSC[i] >= OSC[i-1]:
+                i += 1
+        elif OSC[i] < 0 and OSC[i] <= OSC[i-1]:
+            flagList[i] = -1
+            # 连续下降的时候不一直卖
+            while i < len(data['open']) and OSC[i] < 0 and OSC[i] <= OSC[i-1]:
+                i += 1
+    return flagList
+    
+
+def TrendFollowingStrategy(data, days=10):
+    """
+    当价格上穿移动平均线，买入，价格下移动平均线，卖出
+    """
+    MA = indicator.MA(data,days)
+    flagList = np.zeros(len(data['open']))
+
+    for i in range(days, len(data['open'])):
+        if data['close'][i-1] > MA[i-1] and data['close'][i] < MA[i]:
+            flagList[i] = -1
+        elif data['close'][i-1] < MA[i-1] and data['close'][i] > MA[i]:
+            flagList[i] = 1
+    return flagList

@@ -1,6 +1,8 @@
 import dataPro as dp
 import utils
 import numpy as np
+import talib as ta
+
 
 def MA(data,days:int):
     ma = [x for x in data["close"][:days]]
@@ -54,3 +56,12 @@ def RSI(data,days:int):
     RSI = 100 - 100 / (1 + RS)
     RSI[:days] = 50
     return RSI
+
+def OSC(data,short:int,long:int):
+    '''
+    OSC = short EMA - long EMA
+    '''
+    short_ema = ta.EMA(data['close'],short)
+    long_ema = ta.EMA(data['close'],long)
+    OSC = short_ema - long_ema
+    return OSC

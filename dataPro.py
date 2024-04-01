@@ -166,7 +166,7 @@ class dataPro():
         @dateIndex 提取dataIndex前面的preDays的数据做特征，不包含datIndex天的数据
         @preDays   获取dateIndex前面的preDays天的数据，这样方便预测未来的结果
         '''
-        dataLen = len(self.data["open"])
+        # dataLen = len(self.data["open"])
         x = []
         y = (self.data['close'][dateIndex-1 + futureDays] - self.data['close'][dateIndex-1])/self.data['close'][dateIndex-1]
         for i in range(preDays):
@@ -178,12 +178,26 @@ class dataPro():
             x.insert(0,np.log10(self.data['amount'][dateIndex -1 - i]))
             x.insert(0,self.data['turn'][dateIndex -1 - i])
         return np.array(x),np.array(y*100)
+    
+    def getNormalizeBatchData(self, dateIndex, preDays=5, futureDays = 1):
+        '''
+        功能描述：
+        @dateIndex 提取dataIndex前面的preDays的数据做特征，不包含datIndex天的数据
+        @preDays   获取dateIndex前面的preDays天的数据，这样方便预测未来的结果
+        '''
+        xi, yi = self.getBatchData(dateIndex, preDays, futureDays)
+        xi = (xi - np.mean(xi)) / np.std(xi)
+        return xi, yi
 
-    def getHistoryData(self,startDate, endDate,preDays=5, futureDays=1):
+
+    def getHistoryData(self,startDate, endDate,preDays=5, futureDays=1, normalize=False):
         _x = []
         _y = []
         for i in range(startDate,endDate):
-            x,y = self.getBatchData(i,preDays,futureDays)
+            if normalize:
+                x,y = self.getNormalizeBatchData(i,preDays,futureDays)
+            else:
+                x,y = self.getBatchData(i,preDays,futureDays)
             _x.insert(0,x)
             _y.insert(0,y)
         return np.array(_x),np.array(_y)
