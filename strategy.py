@@ -6,9 +6,9 @@ import indicator
 
 def upMATwoDays(data:"pandas frame",days:int):
     """"
-    收盘价连续两天在均线上则买入，连续两天在均线下则卖出
-    flag主要用于回测，所以flag应该是前面的数据计算的结果，
-    今天的操作应该根据flag来进行，flag=1，则开盘买入，flag=-1，开盘卖出
+    收盘价连续两天在均线上则买入,连续两天在均线下则卖出
+    flag主要用于回测,所以flag应该是前面的数据计算的结果,
+    今天的操作应该根据flag来进行,flag=1,则开盘买入,flag=-1,开盘卖出
     """
     flagList = np.zeros(len(data['open']))
     ma = indicator.MA(data,days)
@@ -21,10 +21,10 @@ def upMATwoDays(data:"pandas frame",days:int):
 
 def MATrend(data:"pandas frame",days:int):
     """"
-    收盘在ma上连续两天，且ma连续两天向上则买入
-    收盘在ma下连续两天，或者ma向下连续两天则卖出
-    flag主要用于回测，所以flag应该是前面的数据计算的结果，
-    今天的操作应该根据flag来进行，flag=1，则开盘买入，flag=-1，开盘卖出
+    收盘在ma上连续两天,且ma连续两天向上则买入
+    收盘在ma下连续两天,或者ma向下连续两天则卖出
+    flag主要用于回测,所以flag应该是前面的数据计算的结果,
+    今天的操作应该根据flag来进行,flag=1,则开盘买入,flag=-1,开盘卖出
     """
     thresh = -0.03#控制当天下跌
     flagList = np.zeros(len(data['open']))
@@ -48,10 +48,10 @@ def MATrend(data:"pandas frame",days:int):
 
 def upMA(data:"pandas frame",days:int):
     """"
-    收盘在ma上连续两天，buy
-    收盘在ma下连续两天，sell
-    flag主要用于回测，所以flag应该是前面的数据计算的结果，
-    今天的操作应该根据flag来进行，flag=1，则开盘买入，flag=-1，开盘卖出
+    收盘在ma上连续两天,buy
+    收盘在ma下连续两天,sell
+    flag主要用于回测,所以flag应该是前面的数据计算的结果,
+    今天的操作应该根据flag来进行,flag=1,则开盘买入,flag=-1,开盘卖出
     """
     thresh = -0.03#控制当天下跌
     flagList = np.zeros(len(data['open']))
@@ -72,7 +72,7 @@ def upMA(data:"pandas frame",days:int):
     return flagList
 
 
-# 连续三天收盘价增高或者降低，就添加趋势翻转标记
+# 连续三天收盘价增高或者降低,就添加趋势翻转标记
 def myMomentDot(data):
     flagList = np.zeros(len(data['open']))
     for i in range(4, len(data["close"])):
@@ -103,7 +103,7 @@ def myMomentDot2(data):
 
 
 def delmyMomentDot2(d):
-    #错误的，提前知道未来三天一定是连续增长或连续下降的，回归结果非常好
+    #错误的,提前知道未来三天一定是连续增长或连续下降的,回归结果非常好
     date = []
     close_p = []
     open_p = []  # 今日开盘价
@@ -208,7 +208,7 @@ def RSIStrategy(data, days=14, high_thresh=70, low_thresh=30):
 
 def OSCStrategy(data,short=12,long=26):
     """
-    当OSC>0,且OSC线的斜率大于0，buy；OSC<0,且OSC线的斜率小于0，sell
+    当OSC>0,且OSC线的斜率大于0,buy；OSC<0,且OSC线的斜率小于0,sell
     """
     OSC = indicator.OSC(data,short,long)
     flagList = np.zeros(len(data['open']))
@@ -228,7 +228,7 @@ def OSCStrategy(data,short=12,long=26):
 
 def TrendFollowingStrategy(data, days=10):
     """
-    当价格上穿移动平均线，买入，价格下移动平均线，卖出
+    当价格上穿移动平均线,买入,价格下移动平均线,卖出
     """
     MA = indicator.MA(data,days)
     flagList = np.zeros(len(data['open']))
