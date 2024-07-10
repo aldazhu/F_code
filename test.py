@@ -19,7 +19,7 @@ def test(flagList,data):
     sellPrice = 0
     dayRatio = np.zeros(len(flagList))
     hold_days = 0
-    stop_loss_ratio = -0.05 #止损
+    stop_loss_ratio = -0.02 #止损
     folow_stop_loss_ratio = -0.08 #跟随止损
     max_earning = -99999999 
 

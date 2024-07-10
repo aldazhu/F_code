@@ -84,6 +84,7 @@ def testGroup(file,startDate,endDate):
     flagList_RSI = sg.RSIStrategy(data, 9, 70, 30)
     flagList_OSC = sg.OSCStrategy(data,7,65)
     # log the flagList for each strategy
+    logger.info("stock code: %s", file)
     logger.info("flagList_upupgo: buy num: %s, sell num :%s",np.sum(flagList_upupgo==1),np.sum(flagList_upupgo==-1))
     logger.info("flagList_doubleMA: buy num: %s, sell num :%s",np.sum(flagList_doubleMA==1),np.sum(flagList_doubleMA==-1))
     logger.info("flagList_moment: buy num: %s, sell num :%s",np.sum(flagList_moment==1),np.sum(flagList_moment==-1))
@@ -94,14 +95,14 @@ def testGroup(file,startDate,endDate):
 
     flagList = np.zeros(len(flagList_upupgo))
 
-    for i in range(len(flagList_upupgo)):
-        if flagList_RSI[i]==1 or flagList_CCI[i]==1 or flagList_doubleMA[i]==1 or flagList_OSC[i]==1:
-            flagList[i] = 1
-        elif   flagList_RSI[i]==-1 or flagList_CCI[i]==-1 or flagList_doubleMA[i]==-1:
-            flagList[i] = -1
+    flagList = flagList_RSI + flagList_doubleMA + flagList_CCI
+    flagList = np.where(flagList>=1,1,flagList)
+    flagList = np.where(flagList<=-1,-1,flagList)
+    logger.info("final flagList: buy num: %s, sell num :%s",np.sum(flagList==1),np.sum(flagList==-1))
 
+        
     earningList, changePercent = test.test(flagList, data)
-    print("group changePercent:", changePercent)
+    logger.info("group changePercent: %s", changePercent)
     #utils.plotEarningRatio(earningList[:100],flagList[:100],data[:100])
     return earningList[-1]
 
@@ -138,7 +139,7 @@ def test_TrendFollowingStrategy(file,startDate,endDate):
     return earningList[-1]
 
 
-def testCovariance(folder,startDate,endDate):
+def testCovariance(folder):
     #当相关系数比较大时，是不是可以当做同一类
     files = os.listdir(folder)
     data = []
@@ -153,8 +154,10 @@ def testCovariance(folder,startDate,endDate):
         for j in range(i,len(files)):
             data2=data[j]
             cov = utils.covariance(data1, data2)
-            if cov>0.6 and cov<0.99:
-                print("{},{},   cov={}".format(name[i],name[j],cov))
+            # if cov>0.8 and cov<0.9999:
+            #     print("{},{},   cov={}".format(name[i],name[j],cov))
+            if cov < -0.2:
+                print("{},{},   cov={}".format(name[i], name[j], cov))
     return cov
 
 def testSvm(file):
@@ -234,16 +237,15 @@ def demo_testOneStock():
     chg = test_TrendFollowingStrategy(filePath,startDate,endDate)
 
 
-def delf():
-    file_path = "./data/sh.600000.csv"
-    data = dp.readData(file_path)
-    data = dp.getNormalData(data)
-    logger.info("date: %s",data['open'][0:1])
+def demo_of_covariance():
+    folder = "./data"
+    testCovariance(folder)
 
 
 #github的tocken ：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
 if __name__ == "__main__":
     # demo_testOneStock()
-    demo_testHS300()
+    demo_of_covariance()
+    # demo_testHS300()
     # delf()
 
