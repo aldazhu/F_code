@@ -196,6 +196,9 @@ def CCIThresh(data, days=5,CCI_thresh = 100, after_Ndays=10):
     return flagList
 
 def RSIStrategy(data, days=14, high_thresh=70, low_thresh=30):
+    '''
+    RSI策略，当RSI>high_thresh时卖出，当RSI<low_thresh时买入
+    '''
     RSI = indicator.RSI(data,days)
     flagList = np.zeros(len(data['open']))
 
