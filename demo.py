@@ -103,7 +103,8 @@ def testGroup(file,startDate,endDate):
         
     earningList, changePercent = test.test(flagList, data)
     logger.info("group changePercent: %s", changePercent)
-    #utils.plotEarningRatio(earningList[:100],flagList[:100],data[:100])
+    utils.plotEarningRatio(earningList[:],flagList[:],data[:])
+
     return earningList[-1]
 
 def test_RSI(file,startDate,endDate):
@@ -195,11 +196,11 @@ def demo_testHS300():
         file = os.path.join(folder, item)
         # chg = testMA(file, startDate, endDate)
         # chg = testMATrend(file, startDate, endDate,15)
-        chg = testUpMA(file, startDate, endDate,10)
+        # chg = testUpMA(file, startDate, endDate,10)
         # chg = testMoment(file, startDate, endDate)
         # chg = testDoubleMA(file,startDate,endDate,fastMADays=7,slowMADays=14)
         # chg = testUpupGo(file,startDate,endDate)
-        # chg = testGroup(file, startDate, endDate)
+        chg = testGroup(file, startDate, endDate)
         # chg = testdel(file,startDate,endDate)
         # chg = testSvm(file)
         # chg = testCCI(file,startDate,endDate,5,-100,10)
@@ -245,7 +246,7 @@ def demo_of_covariance():
 #github的tocken ：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
 if __name__ == "__main__":
     # demo_testOneStock()
-    demo_of_covariance()
-    # demo_testHS300()
+    # demo_of_covariance()
+    demo_testHS300()
     # delf()
 

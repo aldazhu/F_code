@@ -90,7 +90,7 @@ def plotEarningRatio(ratioList,flagList,data):
     ax1.grid()
 
     ax1.plot(x, close, '.-',c="r",label="close")
-    ax1.plot(x, open, '.-',c="g",label="open")
+    # ax1.plot(x, open, '.-',c="g",label="open")
     ax1.legend()
     ax1.set_ylabel('close')
 
@@ -108,7 +108,7 @@ def plotEarningRatio(ratioList,flagList,data):
         #     # mark = "."
         #     # color = "b"
 
-    #plt.legend()
+    plt.legend()
     plt.show()
 
 
