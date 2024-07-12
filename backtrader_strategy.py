@@ -111,6 +111,7 @@ class QuickGuideStrategy(bt.Strategy):
                 self.order = self.sell()
 
 class StragegyTemplate(bt.Strategy):
+    params = (('stop_loss', 0.02))
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
         dt = dt or self.datas[0].datetime.date(0)
@@ -124,6 +125,9 @@ class StragegyTemplate(bt.Strategy):
         self.order = None
         self.buyprice = None
         self.buycomm = None
+
+        self.change_percent = 0
+        self.change_percent_final = 0
 
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
@@ -147,9 +151,11 @@ class StragegyTemplate(bt.Strategy):
                          (order.executed.price,
                           order.executed.value,
                           order.executed.comm))
+                self.change_percent = 100 * (order.executed.price - self.buyprice) / self.buyprice
+                self.change_percent_final += self.change_percent
 
             self.bar_executed = len(self)
-
+            
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
             self.log('Order Canceled/Margin/Rejected')
 
@@ -159,8 +165,9 @@ class StragegyTemplate(bt.Strategy):
         if not trade.isclosed:
             return
 
-        self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f' %
-                 (trade.pnl, trade.pnlcomm))
+        
+        self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f , change_percent: %.2f, change_percent_final: %.2f' %
+                 (trade.pnl, trade.pnlcomm, self.change_percent, self.change_percent_final))
 
     def next(self):
         print("This is a template strategy, please implement your own strategy.")
@@ -228,11 +235,13 @@ class CCIStrategy(StragegyTemplate):
             return
 
         # check if in the market
-        if not self.position:
+        if self.position:
             # if the CCI is above the upper bound, sell
-            if self.cci[0] > self.params.cci_upper:
+            if self.cci[0] > self.params.cci_upper :
                 self.order = self.sell()
+                
         else:
             # if the CCI is below the lower bound, buy
             if self.cci[0] < self.params.cci_lower:
                 self.order = self.buy()
+                
