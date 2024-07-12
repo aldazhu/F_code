@@ -10,6 +10,10 @@ def MA(data,days:int):
         ma.append(sum(data["close"][i-days:i])/days)
     return ma
 
+def EMA(data,days:int):
+    ema = ta.EMA(data['close'],days)
+    return ema
+
 def CCI(data,days:int):
     '''
     Formula

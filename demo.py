@@ -245,8 +245,8 @@ def demo_of_covariance():
 
 #github的tocken ：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
 if __name__ == "__main__":
-    # demo_testOneStock()
+    demo_testOneStock()
     # demo_of_covariance()
-    demo_testHS300()
+    # demo_testHS300()
     # delf()
 
