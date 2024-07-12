@@ -111,7 +111,7 @@ class QuickGuideStrategy(bt.Strategy):
                 self.order = self.sell()
 
 class StragegyTemplate(bt.Strategy):
-    params = (('stop_loss', 0.02))
+    params = (('stop_loss', 0.02),)
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
         dt = dt or self.datas[0].datetime.date(0)
@@ -164,7 +164,6 @@ class StragegyTemplate(bt.Strategy):
     def notify_trade(self, trade):
         if not trade.isclosed:
             return
-
         
         self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f , change_percent: %.2f, change_percent_final: %.2f' %
                  (trade.pnl, trade.pnlcomm, self.change_percent, self.change_percent_final))
