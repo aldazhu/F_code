@@ -6,7 +6,7 @@ import pandas as pd
 
 from my_logger import logger
 
-
+from count_manager import MyCount
 
 
 def demo_of_stock_selector():
@@ -29,15 +29,20 @@ def demo_of_stock_selector():
     
     # 4. select the stock
     data = dp.readData(file_list[0])
+    date_list = data.index.tolist()
+    my_count = MyCount()
     for date_index in range(start_date_index, 100):
-        date = data['date'][date_index]
+        date = date_list[date_index]
         logger.info("Date: %s", date)
         for selector in selector_list:
             selector.select(date_index)
             selected_stocks = selector.selected_stocks_
             for stock, status in selected_stocks.items():
                 logger.info("Stock: %s, Strategy: %s, status: %s", stock, status.strategy_name, status.status)
-    
+                action = "buy" if status.status == 1 else "sell"
+                action_price = data['open'][date_index]
+                my_count.status_update(stock, date_index, action, action_price)
+        my_count.everyday_update(date_index)
 
 if __name__ == "__main__":
     demo_of_stock_selector()
