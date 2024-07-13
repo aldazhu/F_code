@@ -210,7 +210,7 @@ class RSIStrategy(StragegyTemplate):
             return
 
         # check if in the market
-        if not self.position:
+        if self.position:
             # if the RSI is above the upper bound, sell
             if self.rsi[0] > self.params.rsi_upper:
                 self.order = self.sell()
@@ -243,4 +243,85 @@ class CCIStrategy(StragegyTemplate):
             # if the CCI is below the lower bound, buy
             if self.cci[0] < self.params.cci_lower:
                 self.order = self.buy()
+                self.order = self.sell(exectype=bt.Order.StopTrail, trailpercent=self.params.stop_loss)
                 
+
+class OSCStrategy(StragegyTemplate):
+    params = (('short', 10), ('long', 25))
+    def __init__(self):
+        super().__init__()
+        self.short_ma = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=self.params.short)
+        self.long_ma = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=self.params.long)
+        self.osc = self.short_ma - self.long_ma
+
+    def next(self):
+        change = self.dataclose[0] - self.dataclose[-1]
+        change_percent = change / self.dataclose[-1] * 100
+        self.log("Close: %.2f, OSC: %.2f, Change percent: %.2f" % (self.dataclose[0], self.osc[0], change_percent) )
+        # check if there is an unfinished order
+        if self.order:
+            return
+
+        # check if in the market
+        if self.position:
+            # if the OSC is above 0, sell
+            if self.osc[0] > 0:
+                self.order = self.sell()
+        else:
+            # if the OSC is below 0, buy
+            if self.osc[0] < 0:
+                self.order = self.buy()
+
+class DoubleMAStrategy(StragegyTemplate):
+    params = (('short', 10), ('long', 25))
+    def __init__(self):
+        super().__init__()
+        self.short_ma = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=self.params.short)
+        self.long_ma = bt.indicators.SimpleMovingAverage(self.datas[0].close, period=self.params.long)
+
+    def next(self):
+        change = self.dataclose[0] - self.dataclose[-1]
+        change_percent = change / self.dataclose[-1] * 100
+        self.log("Close: %.2f, Short MA: %.2f, Long MA: %.2f, Change percent: %.2f" % (self.dataclose[0], self.short_ma[0], self.long_ma[0], change_percent) )
+        # check if there is an unfinished order
+        if self.order:
+            return
+
+        # check if in the market
+        if self.position:
+            # if the short MA is above the long MA, sell
+            if self.short_ma[0] > self.long_ma[0]:
+                self.order = self.sell()
+        else:
+            # if the short MA is below the long MA, buy
+            if self.short_ma[0] < self.long_ma[0]:
+                self.order = self.buy()
+
+
+class TrendFollowingStrategy(StragegyTemplate):
+    params = (('days', 5),)
+    def __init__(self):
+        super().__init__()
+        self.close = self.datas[0].close
+        self.open = self.datas[0].open
+        self.high = self.datas[0].high
+        self.low = self.datas[0].low
+
+    def next(self):
+        change = self.dataclose[0] - self.dataclose[-1]
+        change_percent = change / self.dataclose[-1] * 100
+        self.log("Close: %.2f, Change percent: %.2f" % (self.dataclose[0], change_percent) )
+        # check if there is an unfinished order
+        if self.order:
+            return
+
+        # check if in the market
+        if self.position:
+            # if the close is below the open, sell
+            if self.close[0] < self.open[0]:
+                self.order = self.sell()
+        else:
+            # if the close is above the open, buy
+            if self.close[0] > self.open[0]:
+                self.order = self.buy()
+
