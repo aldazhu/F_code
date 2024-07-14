@@ -111,7 +111,7 @@ class QuickGuideStrategy(bt.Strategy):
                 self.order = self.sell()
 
 class StragegyTemplate(bt.Strategy):
-    params = (('stop_loss', 0.02),)
+    params = (('stop_loss', 0.05),)
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
         dt = dt or self.datas[0].datetime.date(0)
@@ -128,6 +128,15 @@ class StragegyTemplate(bt.Strategy):
 
         self.change_percent = 0
         self.change_percent_final = 0
+
+    def get_final_change_percent(self):
+        return self.change_percent_final
+
+    def stop_loss_watch_dog(self, price):
+        if self.buyprice:
+            if price < self.buyprice * (1 - self.params.stop_loss):
+                self.log("Stop loss triggered, sell at price: %.2f" % price)
+                self.order = self.sell()
 
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
@@ -194,6 +203,9 @@ class MovingAverageStrategy(StragegyTemplate):
             # if the closing price is below the moving average, sell
             if self.data_close[0] < self.ma[0]:
                 self.order = self.sell()
+        
+        if self.position:
+            self.stop_loss_watch_dog(self.data_close[0])
 
 class RSIStrategy(StragegyTemplate):
     params = (('rsi_period', 14), ('rsi_upper', 70), ('rsi_lower', 30))
@@ -218,6 +230,9 @@ class RSIStrategy(StragegyTemplate):
             # if the RSI is below the lower bound, buy
             if self.rsi[0] < self.params.rsi_lower:
                 self.order = self.buy()
+        
+        if self.position:
+            self.stop_loss_watch_dog(self.data_close[0])
 
 class CCIStrategy(StragegyTemplate):
     params = (('cci_period', 14), ('cci_upper', 100), ('cci_lower', -100))
@@ -243,7 +258,9 @@ class CCIStrategy(StragegyTemplate):
             # if the CCI is below the lower bound, buy
             if self.cci[0] < self.params.cci_lower:
                 self.order = self.buy()
-                self.order = self.sell(exectype=bt.Order.StopTrail, trailpercent=self.params.stop_loss)
+        
+        if self.position:
+            self.stop_loss_watch_dog(self.data_close[0])
                 
 
 class OSCStrategy(StragegyTemplate):
@@ -272,6 +289,9 @@ class OSCStrategy(StragegyTemplate):
             if self.osc[0] < 0:
                 self.order = self.buy()
 
+        if self.position:
+            self.stop_loss_watch_dog(self.data_close[0])
+
 class DoubleMAStrategy(StragegyTemplate):
     params = (('short', 10), ('long', 25))
     def __init__(self):
@@ -288,40 +308,82 @@ class DoubleMAStrategy(StragegyTemplate):
             return
 
         # check if in the market
-        if self.position:
-            # if the short MA is above the long MA, sell
-            if self.short_ma[0] > self.long_ma[0]:
-                self.order = self.sell()
-        else:
-            # if the short MA is below the long MA, buy
-            if self.short_ma[0] < self.long_ma[0]:
+        if not self.position:
+            # if the short MA crosses the long MA from below, buy
+            if self.short_ma[0] > self.long_ma[0] and self.short_ma[-1] < self.long_ma[-1]:
                 self.order = self.buy()
+        else:
+            # if the short MA crosses the long MA from above, sell
+            if self.short_ma[0] < self.long_ma[0] and self.short_ma[-1] > self.long_ma[-1]:
+                self.order = self.sell()
+
+        if self.position:
+            self.stop_loss_watch_dog(self.data_close[0])
 
 
-class TrendFollowingStrategy(StragegyTemplate):
-    params = (('days', 5),)
+
+class GroupStrategy(StragegyTemplate):
+    params = (
+        ('ema_short_period', 8),
+        ('ema_long_period', 20),
+        ('rsi_period',14),
+        ('rsi_upper', 70),
+        ('rsi_lower', 30),
+        ('cci_period', 14),
+        ('cci_upper', 100),
+        ('cci_lower', -100),
+    )
     def __init__(self):
         super().__init__()
-        self.close = self.datas[0].close
-        self.open = self.datas[0].open
-        self.high = self.datas[0].high
-        self.low = self.datas[0].low
+        
+        # Add indicators
+        self.ema_short = bt.indicators.ExponentialMovingAverage(self.datas[0].close, period=self.params.ema_short_period)
+        self.ema_long = bt.indicators.ExponentialMovingAverage(self.datas[0].close, period=self.params.ema_long_period)
+
+        self.rsi = bt.indicators.RSI(self.datas[0].close, period=self.params.rsi_period)
+        self.cci = bt.indicators.CCI(self.datas[0], period=self.params.cci_period)
 
     def next(self):
         change = self.dataclose[0] - self.dataclose[-1]
         change_percent = change / self.dataclose[-1] * 100
-        self.log("Close: %.2f, Change percent: %.2f" % (self.dataclose[0], change_percent) )
+        # self.log("Close: %.2f, EMA Short: %.2f, EMA Long: %.2f, RSI: %.2f, CCI: %.2f, Change percent: %.2f" % (self.dataclose[0], self.ema_short[0], self.ema_long[0], self.rsi[0], self.cci[0], change_percent) )
         # check if there is an unfinished order
         if self.order:
             return
 
-        # check if in the market
+        rsi_signal = 0
+        cci_signal = 0
+        double_emas_signal = 0
+        if self.rsi[0] > self.params.rsi_upper:
+            rsi_signal = -1
+            self.log('rsi %.2f , rsi sell signal')
+        elif self.rsi[0] < self.params.rsi_lower:
+            rsi_signal = 1
+            self.log('rsi %.2f , rsi buy signal')
+
+        if self.cci[0] > self.params.cci_upper:
+            cci_signal = -1
+            self.log('cci %.2f , cci sell signal')
+        elif self.cci[0] < self.params.cci_lower:
+            cci_signal = 1
+            self.log('cci %.2f , cci buy signal')
+
+        if self.ema_short[0] > self.ema_long[0] and self.ema_short[-1] < self.ema_long[-1]:
+            double_emas_signal = 1
+            self.log('double ema buy signal')
+        elif self.ema_short[0] < self.ema_long[0] and self.ema_short[-1] > self.ema_long[-1]:
+            double_emas_signal = -1
+            self.log('double ema sell signal')
+
         if self.position:
-            # if the close is below the open, sell
-            if self.close[0] < self.open[0]:
+            if rsi_signal == -1 or cci_signal == -1 or double_emas_signal == -1:
                 self.order = self.sell()
         else:
-            # if the close is above the open, buy
-            if self.close[0] > self.open[0]:
+            if rsi_signal == 1 or cci_signal == 1 or double_emas_signal == 1:
                 self.order = self.buy()
 
+
+        if self.position:
+            self.stop_loss_watch_dog(self.data_close[0])
+
+    

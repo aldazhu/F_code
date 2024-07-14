@@ -73,7 +73,7 @@ def demo_of_simple_strategy():
 def demo_of_multiple_stocks():
     # Create a Data Feed
     data_name = 'data/sz.300628.csv'
-    from_date = datetime.datetime(2023, 11, 1)
+    from_date = datetime.datetime(2022, 11, 1)
     to_date = datetime.datetime(2024, 12, 31)
     data = get_data(data_name, from_date, to_date)
 
@@ -85,15 +85,17 @@ def demo_of_multiple_stocks():
 
         # test_backtrader(data, strategy=QuickGuideStrategy, cash=100000.0, commission=0.001, stake=100)
 
-        test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=100)
+        # test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=100)
 
-        test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=100)
+        # test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=100)
 
         # test_backtrader(data, strategy=OSCStrategy, cash=100000.0, commission=0.001, stake=100)
 
         # test_backtrader(data, strategy=DoubleMAStrategy, cash=100000.0, commission=0.001, stake=100)
 
         # test_backtrader(data, strategy=TrendFollowingStrategy, cash=100000.0, commission=0.001, stake=100)
+
+        test_backtrader(data, strategy=GroupStrategy, cash=100000.0, commission=0.001, stake=100)
 
 
 if __name__ == '__main__':
