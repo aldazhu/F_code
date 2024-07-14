@@ -136,7 +136,8 @@ class StragegyTemplate(bt.Strategy):
         if self.buyprice:
             if price < self.buyprice * (1 - self.params.stop_loss):
                 self.log("Stop loss triggered, sell at price: %.2f" % price)
-                self.order = self.sell()
+                if self.position.size > 0:
+                    self.order = self.sell()
 
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
@@ -160,8 +161,9 @@ class StragegyTemplate(bt.Strategy):
                          (order.executed.price,
                           order.executed.value,
                           order.executed.comm))
-                self.change_percent = 100 * (order.executed.price - self.buyprice) / self.buyprice
-                self.change_percent_final += self.change_percent
+                if self.buyprice:
+                    self.change_percent = 100 * (order.executed.price - self.buyprice) / self.buyprice
+                    self.change_percent_final += self.change_percent
 
             self.bar_executed = len(self)
             
@@ -354,17 +356,17 @@ class GroupStrategy(StragegyTemplate):
         rsi_signal = 0
         cci_signal = 0
         double_emas_signal = 0
-        if self.rsi[0] > self.params.rsi_upper:
+        if self.rsi[0] < self.params.rsi_upper and self.rsi[-1] >= self.params.rsi_upper:
             rsi_signal = -1
             self.log('rsi %.2f , rsi sell signal')
-        elif self.rsi[0] < self.params.rsi_lower:
+        elif self.rsi[0] > self.params.rsi_lower and self.rsi[-1] <= self.params.rsi_lower:
             rsi_signal = 1
             self.log('rsi %.2f , rsi buy signal')
 
-        if self.cci[0] > self.params.cci_upper:
+        if self.cci[0] < self.params.cci_upper and self.cci[-1] >= self.params.cci_upper:
             cci_signal = -1
             self.log('cci %.2f , cci sell signal')
-        elif self.cci[0] < self.params.cci_lower:
+        elif self.cci[0] > self.params.cci_lower and self.cci[-1] <= self.params.cci_lower:
             cci_signal = 1
             self.log('cci %.2f , cci buy signal')
 
@@ -375,15 +377,17 @@ class GroupStrategy(StragegyTemplate):
             double_emas_signal = -1
             self.log('double ema sell signal')
 
-        if self.position:
+        sell_flag = False
+        if self.position.size > 0: # self.position.size表示当前持仓，小于0表示做空，
             if rsi_signal == -1 or cci_signal == -1 or double_emas_signal == -1:
                 self.order = self.sell()
-        else:
+                sell_flag = True
+        elif self.position.size <= 0:
             if rsi_signal == 1 or cci_signal == 1 or double_emas_signal == 1:
                 self.order = self.buy()
 
 
-        if self.position:
+        if self.position.size > 0 and not sell_flag: # 当天没有卖出，否则可能导致指标卖出一次，stoploss卖出一次
             self.stop_loss_watch_dog(self.data_close[0])
 
     

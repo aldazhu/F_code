@@ -79,7 +79,9 @@ def demo_of_multiple_stocks():
 
     for file in os.listdir('data'):
         data_name = f'data/{file}'
+        # data_name = 'data/sh.600025.csv'
         data = get_data(data_name, from_date, to_date)
+        print(f'test {data_name}')
 
         # test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=100)
 

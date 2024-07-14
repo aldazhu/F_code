@@ -23,7 +23,9 @@ def downloadData(stockCode:str,startDate:str,endDate:str,frequency:str="d"):
     itemList = "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,peTTm,pbMRQ,psTTM,pcfNcfTTM,isST"
     rs = bs.query_history_k_data_plus(stockCode,itemList,
                                       startDate,endDate,
-                                     frequency=frequency)
+                                     frequency=frequency,
+                                     adjustflag=2)
+    # adjustflag : 1 后复权， 2：前复权， 3：不复权
 
     dataList = []
     while(rs.error_code == "0" ) and rs.next():
@@ -324,8 +326,8 @@ def downloadDataDemo():
 def downloadHS300Demo():
     saveFolder = r"./data"
 
-    startDate = "2022-01-01"
-    endDate = "2024-02-05"
+    startDate = "2023-01-01"
+    endDate = "2024-07-05"
     downloadHS300(saveFolder, startDate, endDate)
 
 def downloadZZ1000Demo():
