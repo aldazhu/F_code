@@ -111,7 +111,7 @@ class QuickGuideStrategy(bt.Strategy):
                 self.order = self.sell()
 
 class StragegyTemplate(bt.Strategy):
-    params = (('stop_loss', 0.05),)
+    params = (('stop_loss', 0.08),)
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
         dt = dt or self.datas[0].datetime.date(0)
@@ -126,6 +126,8 @@ class StragegyTemplate(bt.Strategy):
         self.buyprice = None
         self.buycomm = None
 
+        self.max_price_from_buy = 0
+
         self.change_percent = 0
         self.change_percent_final = 0
 
@@ -133,8 +135,15 @@ class StragegyTemplate(bt.Strategy):
         return self.change_percent_final
 
     def stop_loss_watch_dog(self, price):
-        if self.buyprice:
-            if price < self.buyprice * (1 - self.params.stop_loss):
+        if self.position.size > 0:
+            if self.data_high[0] > self.max_price_from_buy:
+                self.max_price_from_buy = self.data_high[0]
+
+        else:
+            self.max_price_from_buy = 0 
+
+        if self.max_price_from_buy:
+            if price < self.max_price_from_buy * (1 - self.params.stop_loss):
                 self.log("Stop loss triggered, sell at price: %.2f" % price)
                 if self.position.size > 0:
                     self.order = self.sell()
@@ -156,6 +165,7 @@ class StragegyTemplate(bt.Strategy):
 
                 self.buyprice = order.executed.price
                 self.buycomm = order.executed.comm
+                self.max_price_from_buy = order.executed.price
             else:  # Sell
                 self.log('SELL EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
                          (order.executed.price,
@@ -164,6 +174,7 @@ class StragegyTemplate(bt.Strategy):
                 if self.buyprice:
                     self.change_percent = 100 * (order.executed.price - self.buyprice) / self.buyprice
                     self.change_percent_final += self.change_percent
+                    self.max_price_from_buy = 0
 
             self.bar_executed = len(self)
             
@@ -326,14 +337,14 @@ class DoubleMAStrategy(StragegyTemplate):
 
 class GroupStrategy(StragegyTemplate):
     params = (
-        ('ema_short_period', 8),
-        ('ema_long_period', 20),
+        ('ema_short_period', 10),
+        ('ema_long_period', 30),
         ('rsi_period',14),
         ('rsi_upper', 70),
         ('rsi_lower', 30),
         ('cci_period', 14),
-        ('cci_upper', 100),
-        ('cci_lower', -100),
+        ('cci_upper', 150),
+        ('cci_lower', -150),
     )
     def __init__(self):
         super().__init__()
@@ -378,10 +389,13 @@ class GroupStrategy(StragegyTemplate):
             self.log('double ema sell signal')
 
         sell_flag = False
+        rsi_signal = 0
+        cci_signal = 0
         if self.position.size > 0: # self.position.size表示当前持仓，小于0表示做空，
             if rsi_signal == -1 or cci_signal == -1 or double_emas_signal == -1:
-                self.order = self.sell()
-                sell_flag = True
+                pass
+                # self.order = self.sell()
+                # sell_flag = True
         elif self.position.size <= 0:
             if rsi_signal == 1 or cci_signal == 1 or double_emas_signal == 1:
                 self.order = self.buy()
