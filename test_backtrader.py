@@ -11,6 +11,7 @@ def test_backtrader(data, strategy, cash=100000.0, commission=0.001,stake=100):
 
     # Add a strategy
     cerebro.addstrategy(strategy)
+    # cerebro.optstrategy(strategy, rsi_period=range(10, 31))
 
     # Add the Data Feed to Cerebro
     cerebro.adddata(data)
@@ -28,12 +29,15 @@ def test_backtrader(data, strategy, cash=100000.0, commission=0.001,stake=100):
     print('Starting Portfolio Value: %.2f' % cerebro.broker.getvalue())
 
     # Run over everything
-    cerebro.run()
+    results = cerebro.run()
 
     # Print out the final result
     print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
 
-    cerebro.plot()
+    # Print the profit
+    profit = cerebro.broker.getvalue() - cash
+
+    return profit
 
 
 def get_data(data_name, from_date, to_date):
@@ -100,7 +104,43 @@ def demo_of_multiple_stocks():
 
         test_backtrader(data, strategy=GroupStrategy, cash=100000.0, commission=0.001, stake=100)
 
+    # test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=100)
+
+def demo_of_multiple_data():
+    data_root = 'data'
+    from_date = datetime.datetime(2020, 1, 1)
+    to_date = datetime.datetime(2024, 12, 31)
+
+    total_gain = 0.0
+    total_count = 0
+    success_count = 0
+    for item in os.listdir(data_root):
+        file = os.path.join(data_root, item)
+        print(f"Processing {file} ...")
+        data = get_data(file, from_date, to_date)
+        try:
+
+            # gain = test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=100) # -525427
+            # gain = test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=100) #3645
+            # rsi sell-->buy：483488, buy-->sell:-242343.07.  -283477.20
+            # gain = test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=100) 
+
+            # -359091.58,
+            gain = test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=100)
+
+            # gain = test_backtrader(data, strategy=DoubleEmaStrategy, cash=100000.0, commission=0.001, stake=100)
+
+            # gain = test_backtrader(data, strategy=NewHighStrategy, cash=100000.0, commission=0.001, stake=100)
+            total_gain += gain
+            total_count += 1
+            if gain >= 0:
+                success_count += 1
+        except Exception as e:
+            print(f"Error in processing {file}, {e}")
+    print(f"Total gain: {total_gain}")
+    print(f"{success_count} / {total_count} acc: {success_count / total_count}")
+
 
 if __name__ == '__main__':
-    demo_of_simple_strategy()
-    # demo_of_multiple_stocks()
+    # demo_of_simple_strategy()
+    demo_of_multiple_data()

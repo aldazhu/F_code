@@ -49,6 +49,22 @@ def download_index_data(indexCode:str,startDate:str,endDate:str,frequency:str="d
     stockData = pd.DataFrame(dataList,columns=rs.fields)
     return stockData
 
+def download_etf(stockCode:str,startDate:str,endDate:str,frequency:str="d"):
+    lg = bs.login()
+    print("login respond: lg.error_code={},lg.error_msg={}"
+      .format(lg.error_code,lg.error_msg))
+    itemList = "date,code,open,high,low,close,preclose,volume,amount,adjustflag"
+    rs = bs.query_history_k_data_plus(stockCode,itemList,
+                                      startDate,endDate,
+                                     frequency=frequency,
+                                     adjustflag="2")
+
+    dataList = []
+    while(rs.error_code == "0" ) and rs.next():
+        dataList.append(rs.get_row_data())
+    stockData = pd.DataFrame(dataList,columns=rs.fields)
+    return stockData
+
 def saveData(data:"pandas frame",folder:"./data", stockCode:"sh.600001"):
     """
     input paramters:
@@ -119,7 +135,8 @@ def downloadHS300(folder:str,startDate:str,endDate:str,frequency:str="d"):
 
         rs = bs.query_history_k_data_plus(stockCode, itemList,
                                           startDate, endDate,
-                                          frequency=frequency)
+                                          frequency=frequency,
+                                          adjustflag="2")
 
         dataList = []
         while (rs.error_code == "0") and rs.next():
@@ -354,6 +371,14 @@ def downloadZZ1000Demo():
     end_date = "2023-05-05"
     downloadData()
     
+def demo_of_download_etf():
+    save_folder = r"./data_etf"
+    start_date = "2020-01-01"
+    end_date = "2023-05-05"
+    etf_list = ["sh.510300","sh.510500","sh.510050","sh.510180","sh.510310","sh.510330","sh.510900","sh.510880","sh.510660","sh.510230","sh.510270","sh.510210"]
+    for etf in etf_list:
+        data = download_etf(etf, start_date, end_date)
+        saveData(data, save_folder, etf)
 
 def clusterDrawDemo():
     src_root = r"./data"
