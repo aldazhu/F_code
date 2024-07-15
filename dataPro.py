@@ -575,6 +575,7 @@ if __name__ == "__main__":
     pass
     # clusterDrawDemo()
     # clusterSaveSampleDemo()
-    downloadDataDemo()
-    # downloadHS300Demo()
+    # downloadDataDemo()
+    # demo_of_download_etf()
+    downloadHS300Demo()
     # DemoOfCluster()

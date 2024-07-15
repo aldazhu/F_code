@@ -224,11 +224,12 @@ class MovingAverageStrategy(StragegyTemplate):
             self.stop_loss_watch_dog(self.data_close[0])
 
 class RSIStrategy(StragegyTemplate):
-    params = (('rsi_period', 14), ('rsi_upper', 70), ('rsi_lower', 30),( 'stop_loss', 0.03))
+    params = (('rsi_period', 15), ('rsi_upper', 70), ('rsi_lower', 30),('high_period', 20),('stop_loss', 0.2))
     def __init__(self):
         super().__init__()
         self.min_price = 0.0
         self.rsi = bt.indicators.RSI(self.datas[0].close, period=self.params.rsi_period)
+        self.highest = bt.indicators.Highest(self.datas[0].high, period=self.params.high_period)
         
     def next(self):
         change = self.dataclose[0] - self.dataclose[-1]
@@ -243,14 +244,9 @@ class RSIStrategy(StragegyTemplate):
             # if the RSI is above the upper bound, sell
             if self.rsi[0] <= self.params.rsi_upper and self.rsi[-1] > self.params.rsi_upper:
                 self.order = self.sell()
-            elif self.dataclose[0] < self.min_price:
-                self.order = self.sell()
-                print("stop loss")
-                self.min_price = 0.0
-            else:
-
-                last_prices = [self.dataclose[-x] for x in range(1,10)]
-                self.min_price = min(last_prices)
+            # elif self.dataclose[0] < self.highest[-1] * (1 - self.params.stop_loss):
+            #     self.order = self.sell()
+            
         else:
             # if the RSI is below the lower bound, buy
             if self.rsi[0] >= self.params.rsi_lower and self.rsi[-1] < self.params.rsi_lower:

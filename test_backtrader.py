@@ -123,10 +123,10 @@ def demo_of_multiple_data():
             # gain = test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=100) # -525427
             # gain = test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=100) #3645
             # rsi sell-->buy：483488, buy-->sell:-242343.07.  -283477.20
-            # gain = test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=100) 
+            gain = test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=100) 
 
             # -359091.58,
-            gain = test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=100)
+            # gain = test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=100)
 
             # gain = test_backtrader(data, strategy=DoubleEmaStrategy, cash=100000.0, commission=0.001, stake=100)
 
