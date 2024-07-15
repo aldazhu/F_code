@@ -187,7 +187,7 @@ def upupgo(data):
 
 def CCIThresh(data, days=5,CCI_thresh = 100, after_Ndays=10):
     """
-    当CCI<-100 buy,after N days sell, CCI > 100 sell
+    当CCI<-CCI_thresh buy,after N days sell, CCI > 100 sell
     """
     CCI = indicator.CCI(data,days)
     flagList_buy = np.where(CCI < -CCI_thresh, 1, 0)

@@ -123,14 +123,18 @@ def demo_of_multiple_data():
             # gain = test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=100) # -525427
             # gain = test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=100) #3645
             # rsi sell-->buy：483488, buy-->sell:-242343.07.  -283477.20
-            gain = test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=100) 
+            # gain = test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=100) 
 
             # -359091.58,
             # gain = test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=100)
 
             # gain = test_backtrader(data, strategy=DoubleEmaStrategy, cash=100000.0, commission=0.001, stake=100)
 
-            # gain = test_backtrader(data, strategy=NewHighStrategy, cash=100000.0, commission=0.001, stake=100)
+            gain = test_backtrader(data, strategy=NewHighStrategy, cash=100000.0, commission=0.001, stake=100)
+
+            # gain = test_backtrader(data, strategy=MACDTrendFollowingStrategy, cash=100000.0, commission=0.001, stake=100)
+
+            # gain = test_backtrader(data, strategy=BollingerBandsStrategy, cash=100000.0, commission=0.001, stake=100)
             total_gain += gain
             total_count += 1
             if gain >= 0:
@@ -141,6 +145,52 @@ def demo_of_multiple_data():
     print(f"{success_count} / {total_count} acc: {success_count / total_count}")
 
 
+def demo_of_multiple_stock():
+    pass
+    data_root = 'data'
+    from_date = datetime.datetime(2020, 1, 1)
+    to_date = datetime.datetime(2024, 12, 31)
+    cash = 100000.0
+    commission = 0.001
+    stake = 100
+
+
+    stock_data_list = []
+    cerebro = bt.Cerebro()
+    cerebro.addstrategy(CCIStrategy)
+
+    for item in os.listdir(data_root)[:20]:
+        file = os.path.join(data_root, item)
+        print(f"Processing {file} ...")
+        data = get_data(file, from_date, to_date)
+        # stock_data_list.append(data)
+        cerebro.adddata(data)
+    
+    # Set our desired cash start
+    cerebro.broker.setcash(cash)
+
+    # Add a FixedSize sizer according to the stake
+    cerebro.addsizer(bt.sizers.FixedSize, stake=stake)
+
+    # Set the commission
+    cerebro.broker.setcommission(commission=commission)
+
+    # Print out the starting conditions
+    print('Starting Portfolio Value: %.2f' % cerebro.broker.getvalue())
+
+    # Run over everything
+    results = cerebro.run()
+
+    # Print out the final result
+    print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
+
+    # Print the profit
+    profit = cerebro.broker.getvalue() - cash
+
+
+
+
 if __name__ == '__main__':
     # demo_of_simple_strategy()
     demo_of_multiple_data()
+    # demo_of_multiple_stock()

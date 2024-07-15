@@ -490,3 +490,43 @@ class NewHighStrategy(StragegyTemplate):
         else:  # in the market
             if self.dataclose[0] < self.low[-1] or self.dataclose[0] < self.high[-1] * (1 - 0.20) or self.dataclose[0] < self.sell_ema[0]:
                 self.order = self.sell()
+
+class MACDTrendFollowingStrategy(StragegyTemplate):
+    params = (('macd1', 12), ('macd2', 26), ('macdsig', 14),)
+
+    def __init__(self):
+        super().__init__()
+        self.macd = bt.indicators.MACD(self.data.close, period_me1=self.params.macd1, period_me2=self.params.macd2, period_signal=self.params.macdsig)
+        self.crossover = bt.indicators.CrossOver(self.macd.macd, self.macd.signal)
+        self.highest = bt.indicators.Highest(self.datas[0].high, period=20)
+
+    def next(self):
+        if self.order:
+            return
+        
+        if not self.position:
+            if self.crossover > 0 and self.dataclose[0] > self.highest[-1]:
+                self.order = self.buy()
+        else:
+            if self.crossover < 0 or self.dataclose[0] < self.highest[-1] * 0.80:
+                self.order = self.sell()
+
+
+class BollingerBandsStrategy(StragegyTemplate):
+    params = (('period', 20), ('devfactor', 2.0),)
+
+    def __init__(self):
+        super().__init__()
+        self.boll = bt.indicators.BollingerBands(self.datas[0], period=self.params.period, devfactor=self.params.devfactor)
+
+    def next(self):
+        if self.order:
+            return
+
+        if not self.position:
+            if self.dataclose[0] <= self.boll.lines.bot and self.dataclose[-1] > self.boll.lines.bot:
+                self.order = self.buy()
+        else:
+            if self.dataclose[0] >= self.boll.lines.top and self.dataclose[-1] < self.boll.lines.top:
+                self.order = self.sell()
+        
