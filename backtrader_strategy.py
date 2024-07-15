@@ -248,7 +248,7 @@ class RSIStrategy(StragegyTemplate):
             self.stop_loss_watch_dog(self.data_close[0])
 
 class CCIStrategy(StragegyTemplate):
-    params = (('cci_period', 14), ('cci_upper', 100), ('cci_lower', -100))
+    params = (('cci_period', 14), ('cci_upper', 150), ('cci_lower', -150))
     def __init__(self):
         super().__init__()
         self.cci = bt.indicators.CCI(self.datas[0], period=self.params.cci_period)
@@ -272,8 +272,7 @@ class CCIStrategy(StragegyTemplate):
             if self.cci[0] < self.params.cci_lower:
                 self.order = self.buy()
         
-        if self.position:
-            self.stop_loss_watch_dog(self.data_close[0])
+        
                 
 
 class OSCStrategy(StragegyTemplate):

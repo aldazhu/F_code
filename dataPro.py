@@ -33,6 +33,21 @@ def downloadData(stockCode:str,startDate:str,endDate:str,frequency:str="d"):
     stockData = pd.DataFrame(dataList,columns=rs.fields)
     return stockData
 
+def download_index_data(indexCode:str,startDate:str,endDate:str,frequency:str="d"):
+    lg = bs.login()
+    print("login respond: lg.error_code={},lg.error_msg={}"
+      .format(lg.error_code,lg.error_msg))
+    itemList = "date,code,open,high,low,close,preclose,volume,amount,pctChg"
+    rs = bs.query_history_k_data_plus(indexCode,itemList,
+                                      startDate,endDate,
+                                     frequency=frequency)
+    # adjustflag : 1 后复权， 2：前复权， 3：不复权
+
+    dataList = []
+    while(rs.error_code == "0" ) and rs.next():
+        dataList.append(rs.get_row_data())
+    stockData = pd.DataFrame(dataList,columns=rs.fields)
+    return stockData
 
 def saveData(data:"pandas frame",folder:"./data", stockCode:"sh.600001"):
     """
@@ -41,6 +56,8 @@ def saveData(data:"pandas frame",folder:"./data", stockCode:"sh.600001"):
     output paramters:
     None
     """
+    if not os.path.isdir(folder):
+        os.makedirs(folder)
 
     savePath = os.path.join(folder,stockCode+".csv")
     data.to_csv(savePath)
@@ -315,12 +332,13 @@ class stockCluster():
         plt.clf()
 
 def downloadDataDemo():
-    saveFolder = r"data"
+    saveFolder = r"data_index"
 
     startDate = "2021-12-31"
-    endDate = "2022-12-25"
-    code = "sz.399300" # 沪深300指数
-    data = downloadData(code,startDate,endDate)
+    endDate = "2024-12-25"
+    code = "sh.000300" # 沪深300指数
+    # data = downloadData(code,startDate,endDate)
+    data = download_index_data(code,startDate,endDate)
     saveData(data,saveFolder,code)
 
 def downloadHS300Demo():
@@ -532,6 +550,6 @@ if __name__ == "__main__":
     pass
     # clusterDrawDemo()
     # clusterSaveSampleDemo()
-    # downloadDataDemo()
-    downloadHS300Demo()
+    downloadDataDemo()
+    # downloadHS300Demo()
     # DemoOfCluster()
