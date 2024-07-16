@@ -4,6 +4,122 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+class DataPro():
+    def __init__(self):
+        self.data = []
+        self.is_baostock_init = False
+        self.save_root = None
+        self.item_dict = {
+            "stock_day_history": "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,peTTm,pbMRQ,psTTM,pcfNcfTTM,isST",
+            "stock_minute_history": "date,time,code,open,high,low,close,volume,amount,adjustflag",
+            "index_history": "date,code,open,high,low,close,volume,amount,adjustflag",
+            "etf_history": "date,code,open,high,low,close,preclose,volume,amount,pctChg,adjustflag"
+        }
+        pass
+
+    def set_save_root(self, save_root):
+        self.save_root = save_root
+
+    def save_data(self, data, stock_code):
+        if self.save_root is None:
+            raise Exception("save root is None, please set the save root first.")
+
+        if not os.path.isdir(self.save_root):
+            os.makedirs(self.save_root)
+        save_path = os.path.join(self.save_root, stock_code + ".csv")
+        data.to_csv(save_path)
+        print(f"save data to {save_path}")
+        
+
+    def init_baostock(self):
+        lg = bs.login()
+        print("login respond: lg.error_code={},lg.error_msg={}"
+              .format(lg.error_code, lg.error_msg))
+        if lg.error_code == "0":
+            self.is_baostock_init = True
+        return self.is_baostock_init
+
+    def download(self, stock_code, start_date, end_date, item_list, frequency,adjustflag="2"):
+        """
+        args:
+        stock_code : stock code eg: stock_code = "sh.600001"
+        start_date : eg:startDate = "2021-03-01"
+        end_date : eg:endDate = "2021-06-01"
+        item_list : the list of the items
+        frequency : optinal parameters: "h":hour,"d":day,"w": week, "m":month, "60":60 minute, "30":30 minute, "15":15 minute, "5":5 minute
+        adjustflag : 1 后复权， 2：前复权， 3：不复权
+        """
+        if not self.is_baostock_init:
+            assert self.init_baostock() == True, "baostock init failed"
+        
+        rs = bs.query_history_k_data_plus(stock_code, item_list,
+                                          start_date, end_date,
+                                          frequency=frequency,
+                                          adjustflag=adjustflag)
+        if rs.error_code != "0":
+            print(f"download {stock_code} data failed")
+            print(f"error_code:{rs.error_code}, error_msg:{rs.error_msg}")
+            return None
+        dataList = []
+        while (rs.error_code == "0") and rs.next():
+            dataList.append(rs.get_row_data())
+        stockData = pd.DataFrame(dataList, columns=rs.fields)
+        return stockData
+
+    def download_k_history(self, stock_code, start_date, end_date,frequency="d",adjustflag="2", mode="stock"):
+        """
+        stock_code : stock code eg: stock_code = "sh.600001"
+        start_date : eg:startDate = "2021-03-01"
+        end_date : eg:endDate = "2021-06-01"
+        frequency : optinal parameters: "h":hour,"d":day,"w": week, "m":month, "60":60 minute, "30":30 minute, "15":15 minute, "5":5 minute
+        adjustflag : 1 后复权， 2：前复权， 3：不复权
+        mode : optinal parameters: "stock","index","etf", index has no minute data
+        """
+        pass
+        if mode == "stock":
+            if frequency == "d" or frequency == "w" or frequency == "m":
+                item_list = self.item_dict["stock_day_history"]
+            elif frequency == "60" or frequency == "30" or frequency == "15" or frequency == "5":
+                item_list = self.item_dict["stock_minute_history"]
+            else:
+                raise Exception("frequency is not supported")
+        
+        elif mode == "index":
+            item_list = self.item_dict["index_history"]
+        elif mode == "etf":
+            item_list = self.item_dict["etf_history"]
+
+        stock_data = self.download(stock_code, start_date, end_date, item_list, frequency, adjustflag)
+        self.save_data(stock_data, stock_code)        
+        print(f"download {stock_code} data success")
+
+    def download_all_hs300_stocks(self, start_date, end_date, frequency="d"):
+        """
+        start_date : eg:startDate = "2021-03-01"
+        end_date : eg:endDate = "2021-06-01"
+        frequency : optinal parameters: "h":hour,"d":day,"w": week, "m":month, "60":60 minute, "30":30 minute, "15":15 minute, "5":5 minute
+        """
+        pass
+        if not self.is_baostock_init:
+            assert self.init_baostock() == True, "baostock init failed"
+        rs = bs.query_hs300_stocks()
+        print('query_hs300 error_code:' + rs.error_code)
+        print('query_hs300  error_msg:' + rs.error_msg)
+        hs300_stocks = []
+        while (rs.error_code == '0') & rs.next():
+            hs300_stocks.append(rs.get_row_data())
+        
+        count = 0
+        with open("names.txt", "w") as f:
+            for stock in hs300_stocks:
+                stock_code = stock[1]
+                stock_name = stock[2]
+                f.write(stock_code + " " + stock_name + "\n")
+                
+                self.download_k_history(stock_code, start_date, end_date, frequency)
+            
+
 # download data from Internet
 def downloadData(stockCode:str,startDate:str,endDate:str,frequency:str="d"):
     """
@@ -130,7 +246,7 @@ def downloadHS300(folder:str,startDate:str,endDate:str,frequency:str="d"):
         hs300_stocks.append(rs.get_row_data())
     result = pd.DataFrame(hs300_stocks, columns=rs.fields)
 
-    itemList = "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,isST"
+    itemList = "date,time,code,open,high,low,close,volume,amount,adjustflag"
     for stockCode in result["code"]:
 
         rs = bs.query_history_k_data_plus(stockCode, itemList,
@@ -351,7 +467,7 @@ class stockCluster():
 def downloadDataDemo():
     saveFolder = r"data_index"
 
-    startDate = "2021-12-31"
+    startDate = "2016-1-1"
     endDate = "2024-12-25"
     code = "sh.000300" # 沪深300指数
     # data = downloadData(code,startDate,endDate)
@@ -359,11 +475,12 @@ def downloadDataDemo():
     saveData(data,saveFolder,code)
 
 def downloadHS300Demo():
-    saveFolder = r"./data"
+    saveFolder = r"./data_hour_hs300"
 
-    startDate = "2023-01-01"
+    startDate = "2022-01-01"
     endDate = "2024-07-05"
-    downloadHS300(saveFolder, startDate, endDate)
+    frequency = "60"
+    downloadHS300(saveFolder, startDate, endDate, frequency)
 
 def downloadZZ1000Demo():
     save_folder = r"./data/zz1000"
@@ -569,6 +686,16 @@ def DemoOfCluster():
         image_save_path =os.path.join(image_save_folder,f"{str(image_num)}_pre{preDays}_feat{futureDays}.png") 
         # tool.drawOneSample(X[i],Y[i],True,image_save_path)
 
+def demo_of_datapro():
+    save_root = "./data_test"
+    dp = DataPro()
+    dp.set_save_root(save_root)
+    stock_code = "sh.000300"
+    start_date = "2024-01-01"
+    end_date = "2024-02-05"
+    frequency = "60"
+    dp.download_k_history(stock_code, start_date, end_date, frequency,mode="index")
+    # dp.download_all_hs300_stocks(start_date, end_date, frequency)
 
 
 if __name__ == "__main__":
@@ -577,5 +704,6 @@ if __name__ == "__main__":
     # clusterSaveSampleDemo()
     # downloadDataDemo()
     # demo_of_download_etf()
-    downloadHS300Demo()
+    # downloadHS300Demo()
     # DemoOfCluster()
+    demo_of_datapro()
