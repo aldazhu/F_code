@@ -2,6 +2,8 @@ import backtrader as bt
 import backtrader.feeds as btfeeds
 import datetime
 
+from backtrader_indicator import RSRS, RSRS_Norm
+
 class MyData(btfeeds.GenericCSVData):
     params = (
         ('fromdate', datetime.datetime(2022, 11, 1)),
@@ -115,7 +117,7 @@ class StragegyTemplate(bt.Strategy):
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
         dt = dt or self.datas[0].datetime.date(0)
-        print('%s, %s' % (dt.isoformat(), txt))
+        # print('%s, %s' % (dt.isoformat(), txt))
 
     def __init__(self):
         # Keep a reference to the "close" line in the data[0] dataseries
@@ -418,11 +420,11 @@ class GroupStrategy(StragegyTemplate):
 
 class CombinedIndicatorStrategy(StragegyTemplate):
     params = (
-        ('ma_period', 15),
+        ('ma_period', 50),
         ('rsi_period', 14),
         ('cci_period', 20),
-        ('cci_upper', 100),
-        ('cci_lower', -100),
+        ('cci_upper', 150),
+        ('cci_lower', -150),
         ('rsi_upper', 70),
         ('rsi_lower', 30)
     )
@@ -438,10 +440,10 @@ class CombinedIndicatorStrategy(StragegyTemplate):
             return
 
         if self.position.size <= 0:  # not in the market
-            if (self.cci[0] < self.params.cci_lower or self.rsi[0] < self.params.rsi_lower):
+            if (self.cci[0] < self.params.cci_lower or self.rsi[0] < self.params.rsi_lower) :
                 self.order = self.buy()
         else:  # in the market
-            if self.cci[0] > self.params.cci_upper or self.rsi[0] > self.params.rsi_upper or  self.datas[0].close[0] < self.ma[0]:
+            if self.cci[0] > self.params.cci_upper or self.rsi[0] > self.params.rsi_upper :
                 self.order = self.sell()
 
 class DoubleEmaStrategy(StragegyTemplate):
@@ -530,3 +532,25 @@ class BollingerBandsStrategy(StragegyTemplate):
             if self.dataclose[0] >= self.boll.lines.top and self.dataclose[-1] < self.boll.lines.top:
                 self.order = self.sell()
         
+
+class RSRSStrategy(StragegyTemplate):
+    params = (('N', 18), ('value', 5),('rsrs_norm_thresh',0.7))
+
+    def __init__(self):
+        super().__init__()
+        self.rsrs = RSRS(self.datas[0])
+        self.rsrs_norm = RSRS_Norm(self.datas[0])
+        self.rsrs_r2 = self.rsrs_norm * self.rsrs.R2
+        self.beta_right = self.rsrs * self.rsrs_r2
+
+    def next(self):
+        if self.order:
+            return
+
+        # print(f"{self.datas[0].datetime.date(0)}, beta_right: {self.beta_right[0]}, rsrs_norm: {self.rsrs_norm[0]}, rsrs_r2: {self.rsrs_r2[0]}")
+        if not self.position:
+            if self.rsrs_norm[0] > self.params.rsrs_norm_thresh:
+                self.order = self.buy()
+        else:
+            if self.rsrs_norm[0] < - self.params.rsrs_norm_thresh:
+                self.order = self.sell()

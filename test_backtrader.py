@@ -28,11 +28,20 @@ def test_backtrader(data, strategy, cash=100000.0, commission=0.001,stake=100):
     # Print out the starting conditions
     print('Starting Portfolio Value: %.2f' % cerebro.broker.getvalue())
 
+    # Add analyzers
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='mysharpe')
+    cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
+    cerebro.addanalyzer(bt.analyzers.Returns)
+
     # Run over everything
     results = cerebro.run()
 
     # Print out the final result
     print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
+
+    print('Sharpe Ratio:', results[0].analyzers.mysharpe.get_analysis())
+    print('max Draw Down:', results[0].analyzers.drawdown.get_analysis()['max'])
+    print('return:', results[0].analyzers.returns.get_analysis()['rnorm100'])
 
     # Print the profit
     profit = cerebro.broker.getvalue() - cash
@@ -57,57 +66,21 @@ def demo_of_simple_strategy():
     from_date = datetime.datetime(2023, 1, 1)
     to_date = datetime.datetime(2024, 12, 31)
     data = get_data(data_name, from_date, to_date)
+    stake = 100
 
-    # test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=100)
+    # test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-    # test_backtrader(data, strategy=QuickGuideStrategy, cash=100000.0, commission=0.001, stake=100)
+    # test_backtrader(data, strategy=QuickGuideStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-    test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=1)
+    # test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-    # test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=1)
+    test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-    # test_backtrader(data, strategy=OSCStrategy, cash=100000.0, commission=0.001, stake=100)
-
-    # test_backtrader(data, strategy=DoubleMAStrategy, cash=100000.0, commission=0.001, stake=100)
-
-    # test_backtrader(data, strategy=TrendFollowingStrategy, cash=100000.0, commission=0.001, stake=100)
-
-
-
-
-def demo_of_multiple_stocks():
-    # Create a Data Feed
-    data_name = 'data/sz.300628.csv'
-    from_date = datetime.datetime(2022, 11, 1)
-    to_date = datetime.datetime(2024, 12, 31)
-    data = get_data(data_name, from_date, to_date)
-
-    for file in os.listdir('data'):
-        data_name = f'data/{file}'
-        # data_name = 'data/sh.600025.csv'
-        data = get_data(data_name, from_date, to_date)
-        print(f'test {data_name}')
-
-        # test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=100)
-
-        # test_backtrader(data, strategy=QuickGuideStrategy, cash=100000.0, commission=0.001, stake=100)
-
-        # test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=100)
-
-        # test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=100)
-
-        # test_backtrader(data, strategy=OSCStrategy, cash=100000.0, commission=0.001, stake=100)
-
-        # test_backtrader(data, strategy=DoubleMAStrategy, cash=100000.0, commission=0.001, stake=100)
-
-        # test_backtrader(data, strategy=TrendFollowingStrategy, cash=100000.0, commission=0.001, stake=100)
-
-        test_backtrader(data, strategy=GroupStrategy, cash=100000.0, commission=0.001, stake=100)
-
-    # test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=100)
+    # test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=stake)
 
 def demo_of_multiple_data():
     data_root = 'data'
+    stake = 100
     from_date = datetime.datetime(2020, 1, 1)
     to_date = datetime.datetime(2024, 12, 31)
 
@@ -120,21 +93,23 @@ def demo_of_multiple_data():
         data = get_data(file, from_date, to_date)
         try:
 
-            # gain = test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=100) # -525427
-            # gain = test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=100) #3645
+            # gain = test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=stake) # -525427
+            # gain = test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=stake) #3645
             # rsi sell-->buy：483488, buy-->sell:-242343.07.  -283477.20
-            # gain = test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=100) 
+            # gain = test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=stake) 
 
             # -359091.58,
-            # gain = test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=100)
+            # gain = test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-            # gain = test_backtrader(data, strategy=DoubleEmaStrategy, cash=100000.0, commission=0.001, stake=100)
+            # gain = test_backtrader(data, strategy=DoubleEmaStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-            gain = test_backtrader(data, strategy=NewHighStrategy, cash=100000.0, commission=0.001, stake=100)
+            # gain = test_backtrader(data, strategy=NewHighStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-            # gain = test_backtrader(data, strategy=MACDTrendFollowingStrategy, cash=100000.0, commission=0.001, stake=100)
+            # gain = test_backtrader(data, strategy=MACDTrendFollowingStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-            # gain = test_backtrader(data, strategy=BollingerBandsStrategy, cash=100000.0, commission=0.001, stake=100)
+            # gain = test_backtrader(data, strategy=BollingerBandsStrategy, cash=100000.0, commission=0.001, stake=stake)
+
+            gain = test_backtrader(data, strategy=RSRSStrategy, cash=100000.0, commission=0.001, stake=stake)
             total_gain += gain
             total_count += 1
             if gain >= 0:
@@ -164,7 +139,7 @@ def demo_of_multiple_stock():
         print(f"Processing {file} ...")
         data = get_data(file, from_date, to_date)
         # stock_data_list.append(data)
-        cerebro.adddata(data)
+        cerebro.adddata(data, name=item)
     
     # Set our desired cash start
     cerebro.broker.setcash(cash)
