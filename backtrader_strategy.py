@@ -20,6 +20,22 @@ class MyData(btfeeds.GenericCSVData):
         ('openinterest', -1)
     )
 
+class MyMinutelyData(btfeeds.GenericCSVData):
+    params = (
+        ('fromdate', datetime.datetime(2022, 11, 1)),
+        ('todate', datetime.datetime(2023, 12, 31)),
+        ('dtformat', ('%Y-%m-%dT%H%M%S')),
+        # ('tmformat', ('%H.%M.%S')),
+        ('datetime', 1), # 20220104103000000
+        ('time', 2),
+        ('open', 4),
+        ('high', 5),
+        ('low', 6),
+        ('close', 7),
+        ('volume', 8),
+        ('openinterest', -1)
+    )
+
 
 # https://www.backtrader.com/docu/quickstart/quickstart/#customizing-the-strategy-parameters
 class QuickGuideStrategy(bt.Strategy):

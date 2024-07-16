@@ -29,7 +29,7 @@ def test_backtrader(data, strategy, cash=100000.0, commission=0.001,stake=100):
     print('Starting Portfolio Value: %.2f' % cerebro.broker.getvalue())
 
     # Add analyzers
-    cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='mysharpe')
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='mysharpe', riskfreerate=0.03)
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
     cerebro.addanalyzer(bt.analyzers.Returns)
 
@@ -62,13 +62,24 @@ def get_data(data_name, from_date, to_date):
                 todate=to_date)
     return data
 
+def get_minutely_data(data_name, from_date, to_date):
+    if not os.path.exists(data_name):
+        print(f"Data file {data_name} does not exist.")
+        raise "Data file does not exist."
+
+    data = MyMinutelyData(dataname=data_name,
+                fromdate=from_date,
+                todate=to_date)
+    return data
+
 def demo_of_simple_strategy():
     # Create a Data Feed
-    # data_name = 'data/sz.300628.csv'
+    # data_name = 'data_hour/sz.300628.csv'
     data_name = 'data_index/sh.000300.csv'
     from_date = datetime.datetime(2016, 1, 1)
     to_date = datetime.datetime(2024, 12, 31)
     data = get_data(data_name, from_date, to_date)
+    # data = get_minutely_data(data_name, from_date, to_date)
     stake = 1
 
     # test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=stake)
@@ -77,11 +88,11 @@ def demo_of_simple_strategy():
 
     # test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-    # test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=stake)
+    test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=stake)
 
     # test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-    test_backtrader(data, strategy=RSRSStrategy, cash=100000.0, commission=0.001, stake=stake)
+    # test_backtrader(data, strategy=RSRSStrategy, cash=100000.0, commission=0.001, stake=stake)
 
     # test_backtrader(data, strategy=GroupStrategy, cash=100000.0, commission=0.001, stake=stake)
 
