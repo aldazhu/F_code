@@ -117,7 +117,7 @@ class StragegyTemplate(bt.Strategy):
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
         dt = dt or self.datas[0].datetime.date(0)
-        # print('%s, %s' % (dt.isoformat(), txt))
+        print('%s, %s' % (dt.isoformat(), txt))
 
     def __init__(self):
         # Keep a reference to the "close" line in the data[0] dataseries
@@ -132,6 +132,9 @@ class StragegyTemplate(bt.Strategy):
 
         self.change_percent = 0
         self.change_percent_final = 0
+
+        self.trade_count = 0
+        self.succeed_trade_count = 0
 
     def get_final_change_percent(self):
         return self.change_percent_final
@@ -222,8 +225,8 @@ class MovingAverageStrategy(StragegyTemplate):
             if self.data_close[0] < self.ma[0]:
                 self.order = self.sell()
         
-        if self.position:
-            self.stop_loss_watch_dog(self.data_close[0])
+        # if self.position:
+        #     self.stop_loss_watch_dog(self.data_close[0])
 
 class RSIStrategy(StragegyTemplate):
     params = (('rsi_period', 15), ('rsi_upper', 70), ('rsi_lower', 30),('high_period', 20),('stop_loss', 0.2))
@@ -277,8 +280,8 @@ class CCIStrategy(StragegyTemplate):
             # if the CCI is above the upper bound, sell
             if self.cci[0] < self.params.cci_upper and self.cci[-1] >= self.params.cci_upper:
                 self.order = self.sell()
-            # elif self.dataclose[0] < self.high[-1] * 0.80:
-            #     self.order = self.sell()
+            elif self.dataclose[0] < self.high[-1] * 0.80:
+                self.order = self.sell()
                 
         else:
             # if the CCI is below the lower bound, buy
@@ -404,17 +407,17 @@ class GroupStrategy(StragegyTemplate):
         rsi_signal = 0
         cci_signal = 0
         if self.position.size > 0: # self.position.size表示当前持仓，小于0表示做空，
-            if rsi_signal == -1 or cci_signal == -1 or double_emas_signal == -1:
+            if rsi_signal == -1 or cci_signal == -1 :
                 pass
-                # self.order = self.sell()
+                self.order = self.sell()
                 # sell_flag = True
         elif self.position.size <= 0:
             if rsi_signal == 1 or cci_signal == 1 or double_emas_signal == 1:
                 self.order = self.buy()
 
 
-        if self.position.size > 0 and not sell_flag: # 当天没有卖出，否则可能导致指标卖出一次，stoploss卖出一次
-            self.stop_loss_watch_dog(self.data_close[0])
+        # if self.position.size > 0 and not sell_flag: # 当天没有卖出，否则可能导致指标卖出一次，stoploss卖出一次
+        #     self.stop_loss_watch_dog(self.data_close[0])
 
     
 
@@ -534,7 +537,7 @@ class BollingerBandsStrategy(StragegyTemplate):
         
 
 class RSRSStrategy(StragegyTemplate):
-    params = (('N', 18), ('value', 5),('rsrs_norm_thresh',0.7))
+    params = (('N', 18), ('value', 5),('rsrs_norm_thresh',0.8))
 
     def __init__(self):
         super().__init__()

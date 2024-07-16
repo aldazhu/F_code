@@ -46,6 +46,9 @@ def test_backtrader(data, strategy, cash=100000.0, commission=0.001,stake=100):
     # Print the profit
     profit = cerebro.broker.getvalue() - cash
 
+    # Visulize the result
+    # cerebro.plot()
+
     return profit
 
 
@@ -63,10 +66,10 @@ def demo_of_simple_strategy():
     # Create a Data Feed
     # data_name = 'data/sz.300628.csv'
     data_name = 'data_index/sh.000300.csv'
-    from_date = datetime.datetime(2023, 1, 1)
+    from_date = datetime.datetime(2016, 1, 1)
     to_date = datetime.datetime(2024, 12, 31)
     data = get_data(data_name, from_date, to_date)
-    stake = 100
+    stake = 1
 
     # test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=stake)
 
@@ -74,9 +77,13 @@ def demo_of_simple_strategy():
 
     # test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-    test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=stake)
+    # test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=stake)
 
     # test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=stake)
+
+    test_backtrader(data, strategy=RSRSStrategy, cash=100000.0, commission=0.001, stake=stake)
+
+    # test_backtrader(data, strategy=GroupStrategy, cash=100000.0, commission=0.001, stake=stake)
 
 def demo_of_multiple_data():
     data_root = 'data'
@@ -166,6 +173,6 @@ def demo_of_multiple_stock():
 
 
 if __name__ == '__main__':
-    # demo_of_simple_strategy()
-    demo_of_multiple_data()
+    demo_of_simple_strategy()
+    # demo_of_multiple_data()
     # demo_of_multiple_stock()
