@@ -549,8 +549,8 @@ class DoubleEmaStrategy(StragegyTemplate):
 
 class NewHighStrategy(StragegyTemplate):
     params = (
-        ('highest_window', 10),
-        ('lowest_window', 5),
+        ('highest_window', 20),
+        ('lowest_window', 8),
         ('ema_period', 120),
         ('ema_sell_period', 50)
     )
@@ -573,7 +573,7 @@ class NewHighStrategy(StragegyTemplate):
 
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0:
-                if data.close[0] > self.high[i][-1] and data.close[0] > self.ema[i][-1]:
+                if data.close[0] > self.high[i][-1] :
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
             else:

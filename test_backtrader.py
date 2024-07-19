@@ -1,5 +1,6 @@
 import backtrader as bt
 import datetime
+import random
 
 import os
 
@@ -31,7 +32,7 @@ def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100
     print('Starting Portfolio Value: %.2f' % cerebro.broker.getvalue())
 
     # Add analyzers
-    cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='mysharpe', riskfreerate=0.03)
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='mysharpe', riskfreerate=0.0)
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
     cerebro.addanalyzer(bt.analyzers.Returns)
 
@@ -77,6 +78,8 @@ def get_minutely_data(data_name, from_date, to_date):
 def demo_of_simple_strategy():
     # Create a Data Feed
     data_root = "data"
+    test_all_data = True
+
     data_names = [
         f'{data_root}/sz.300628.csv',
         f'{data_root}/sz.300979.csv',
@@ -89,8 +92,11 @@ def demo_of_simple_strategy():
         f'{data_root}/sz.001289.csv',
         f'{data_root}/sz.002230.csv',
         f'{data_root}/sz.002714.csv'
-        
     ]
+
+    if test_all_data:
+        data_names = [os.path.join(data_root, item) for item in os.listdir(data_root)]
+
     # data_name = 'data_index/sh.000300.csv'
     from_date = datetime.datetime(2016, 1, 1)
     to_date = datetime.datetime(2024, 12, 31)
@@ -105,13 +111,13 @@ def demo_of_simple_strategy():
 
     strategies = [
         NewHighStrategy ,# ok
-        MovingAverageStrategy, # ok
-        CombinedIndicatorStrategy, # ok
-        RSIStrategy, # ok
-        CCIStrategy,  # ok
-        DoubleEmaStrategy, # ok
-        MACDTrendFollowingStrategy, # ok
-        BollingerBandsStrategy, # ok
+        # MovingAverageStrategy, # ok
+        # CombinedIndicatorStrategy, # ok
+        # RSIStrategy, # ok
+        # CCIStrategy,  # ok
+        # DoubleEmaStrategy, # ok
+        # MACDTrendFollowingStrategy, # ok
+        # BollingerBandsStrategy, # ok
         # RSRSStrategy # ok
     ]
 
