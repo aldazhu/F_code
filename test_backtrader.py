@@ -5,16 +5,18 @@ import os
 
 from backtrader_strategy import *
 
-def test_backtrader(data, strategy, cash=100000.0, commission=0.001,stake=100):
+def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100):
     # Create a cerebro entity
     cerebro = bt.Cerebro()
 
     # Add a strategy
-    cerebro.addstrategy(strategy)
-    # cerebro.optstrategy(strategy, rsi_period=range(10, 31))
+    for strategy in strategies:
+        cerebro.addstrategy(strategy)
+        # cerebro.optstrategy(strategy, rsi_period=range(10, 31))
 
     # Add the Data Feed to Cerebro
-    cerebro.adddata(data)
+    for data in datas:
+        cerebro.adddata(data)
 
     # Set our desired cash start
     cerebro.broker.setcash(cash)
@@ -74,29 +76,46 @@ def get_minutely_data(data_name, from_date, to_date):
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    data_name = 'data_hour/sz.300628.csv'
+    data_root = "data"
+    data_names = [
+        f'{data_root}/sz.300628.csv',
+        f'{data_root}/sz.300979.csv',
+        f'{data_root}/sh.600000.csv',
+        f'{data_root}/sh.600089.csv',
+        f'{data_root}/sh.601059.csv',
+        f'{data_root}/sh.603296.csv',
+        f'{data_root}/sh.603501.csv',
+        f'{data_root}/sz.000733.csv',
+        f'{data_root}/sz.001289.csv',
+        f'{data_root}/sz.002230.csv',
+        f'{data_root}/sz.002714.csv'
+        
+    ]
     # data_name = 'data_index/sh.000300.csv'
     from_date = datetime.datetime(2016, 1, 1)
     to_date = datetime.datetime(2024, 12, 31)
     # data = get_data(data_name, from_date, to_date)
-    data = get_minutely_data(data_name, from_date, to_date)
+    datas = [
+        get_data(data_name, from_date, to_date) for data_name in data_names
+        # get_minutely_data(data_name, from_date, to_date) for data_name in data_names
+    ]
+
     stake = 100
 
-    # test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=stake)
+    strategies = [
+        NewHighStrategy # ok
+        # MovingAverageStrategy, # ok
+        # CombinedIndicatorStrategy, # ok
+        # RSIStrategy, # ok
+        # CCIStrategy,  # ok
+        # DoubleEmaStrategy, # ok
+        # MACDTrendFollowingStrategy, # ok
+        # BollingerBandsStrategy, # ok
+        # RSRSStrategy # ok
+    ]
 
-    # test_backtrader(data, strategy=QuickGuideStrategy, cash=100000.0, commission=0.001, stake=stake)
+    test_backtrader(datas, strategies=strategies, cash=100000.0, commission=0.001, stake=stake)
 
-    # test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=stake)
-
-    # test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=stake)
-
-    test_backtrader(data, strategy=NewHighStrategy, cash=100000.0, commission=0.001, stake=stake)
-
-    # test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=stake)
-
-    # test_backtrader(data, strategy=RSRSStrategy, cash=100000.0, commission=0.001, stake=stake)
-
-    # test_backtrader(data, strategy=GroupStrategy, cash=100000.0, commission=0.001, stake=stake)
 
 def demo_of_multiple_data():
     data_root = 'data'

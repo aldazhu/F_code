@@ -130,6 +130,8 @@ class QuickGuideStrategy(bt.Strategy):
 
 class StragegyTemplate(bt.Strategy):
     params = (('stop_loss', 0.08),)
+    trade_count = 0
+    succeed_trade_count = 0
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
         dt = dt or self.datas[0].datetime.date(0)
@@ -150,8 +152,8 @@ class StragegyTemplate(bt.Strategy):
         self.change_percent = 0
         self.change_percent_final = 0
 
-        self.trade_count = 0
-        self.succeed_trade_count = 0
+        # self.trade_count = 0
+        # self.succeed_trade_count = 0
 
     def get_final_change_percent(self):
         return self.change_percent_final
@@ -212,8 +214,9 @@ class StragegyTemplate(bt.Strategy):
         if not trade.isclosed:
             return
         
-        self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f , change_percent: %.2f, change_percent_final: %.2f, success: %d / all %d , acc: %.2f %%' %
-                 (trade.pnl, trade.pnlcomm, self.change_percent, self.change_percent_final, self.succeed_trade_count, self.trade_count, 100 * self.succeed_trade_count / self.trade_count))
+        if self.trade_count > 0:
+            self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f , change_percent: %.2f, change_percent_final: %.2f, success: %d / all %d , acc: %.2f %%' %
+                    (trade.pnl, trade.pnlcomm, self.change_percent, self.change_percent_final, self.succeed_trade_count, self.trade_count, 100 * self.succeed_trade_count / self.trade_count))
 
     def next(self):
         print("This is a template strategy, please implement your own strategy.")
@@ -233,7 +236,7 @@ class MovingAverageStrategy(StragegyTemplate):
             return
 
         # check if in the market
-        if not self.position:
+        if self.position.size <= 0:
             # if the closing price is above the moving average, buy
             if self.data_close[0] > self.ma[0]:
                 self.order = self.buy()
@@ -490,7 +493,7 @@ class DoubleEmaStrategy(StragegyTemplate):
 
 class NewHighStrategy(StragegyTemplate):
     params = (
-        ('highest_window', 20),
+        ('highest_window', 10),
         ('lowest_window', 5),
         ('ema_period', 120),
         ('ema_sell_period', 50)
@@ -498,25 +501,31 @@ class NewHighStrategy(StragegyTemplate):
 
     def __init__(self):
         super().__init__()
-        self.high = bt.indicators.Highest(self.datas[0].high, period=self.params.highest_window)
-        self.low = bt.indicators.Lowest(self.datas[0].low, period=self.params.lowest_window)
-        self.ema = bt.indicators.ExponentialMovingAverage(self.datas[0], period=self.params.ema_period)
-        self.sell_ema = bt.indicators.ExponentialMovingAverage(self.datas[0], period=self.params.ema_sell_period)
+        self.high = []
+        self.low = []
+        self.ema = []
+        self.ema_sell = []
+        for i, data in enumerate(self.datas):
+            self.high.append(bt.indicators.Highest(data.high, period=self.params.highest_window))
+            self.low.append(bt.indicators.Lowest(data.low, period=self.params.lowest_window))
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema_sell.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_sell_period))
 
     def next(self):
         if self.order:
             return
 
-        if not self.position:  # not in the market
-            if self.dataclose[0] > self.high[-1] and self.dataclose[0] > self.ema[0]:
-                self.order = self.buy()
-        else:  # in the market
-            if self.dataclose[0] < self.low[-1] :
-                pass
-                # self.order = self.sell()
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0:
+                if data.close[0] > self.high[i][-1] and data.close[0] > self.ema[i][-1]:
+                    print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
+                    self.order = self.buy(data)
+            else:
+                if data.close[0] < self.low[i][-1] :
+                    print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
+                    self.order = self.sell(data)
 
-        if self.position:
-            self.stop_loss_watch_dog(self.data_close[0])
+        
 class MACDTrendFollowingStrategy(StragegyTemplate):
     params = (('macd1', 12), ('macd2', 26), ('macdsig', 14),)
 
