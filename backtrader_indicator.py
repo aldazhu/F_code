@@ -26,7 +26,7 @@ class RSRS(bt.Indicator):
 
 class RSRS_Norm(bt.Indicator):
     lines = ('rsrs_norm','rsrs_r2','beta_right')
-    params = (('N', 18), ('M', 600))
+    params = (('N', 18), ('M', 200))
     def __init__(self):
         self.rsrs = RSRS(self.data)
         self.lines.rsrs_norm = (self.rsrs - bt.ind.Average(self.rsrs, period=self.p.M))/bt.ind.StandardDeviation(self.rsrs, period= self.p.M)

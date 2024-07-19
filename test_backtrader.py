@@ -95,22 +95,23 @@ def demo_of_simple_strategy():
     from_date = datetime.datetime(2016, 1, 1)
     to_date = datetime.datetime(2024, 12, 31)
     # data = get_data(data_name, from_date, to_date)
-    datas = [
-        get_data(data_name, from_date, to_date) for data_name in data_names
-        # get_minutely_data(data_name, from_date, to_date) for data_name in data_names
-    ]
+    
+    if "hour" in data_names[0]:
+        datas = [get_minutely_data(data_name, from_date, to_date) for data_name in data_names]
+    else:
+        datas = [get_data(data_name, from_date, to_date) for data_name in data_names]
 
     stake = 100
 
     strategies = [
-        NewHighStrategy # ok
-        # MovingAverageStrategy, # ok
-        # CombinedIndicatorStrategy, # ok
-        # RSIStrategy, # ok
-        # CCIStrategy,  # ok
-        # DoubleEmaStrategy, # ok
-        # MACDTrendFollowingStrategy, # ok
-        # BollingerBandsStrategy, # ok
+        NewHighStrategy ,# ok
+        MovingAverageStrategy, # ok
+        CombinedIndicatorStrategy, # ok
+        RSIStrategy, # ok
+        CCIStrategy,  # ok
+        DoubleEmaStrategy, # ok
+        MACDTrendFollowingStrategy, # ok
+        BollingerBandsStrategy, # ok
         # RSRSStrategy # ok
     ]
 
