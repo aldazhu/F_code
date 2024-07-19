@@ -128,10 +128,47 @@ class QuickGuideStrategy(bt.Strategy):
                 # Keep track of the created order to avoid a 2nd order
                 self.order = self.sell()
 
+# a class of stock data , buy, sell, hold days, earning ratio etc
+class StockStatus:
+    def __init__(self, stock_code, strategy_name):
+        self.stock_code = stock_code
+        self.strategy_name = strategy_name
+        self.status = 0
+        self.buy_date = ""
+        self.sell_date = ""
+        self.buy_price = 0
+        self.sell_price = 0
+        self.hold_days = 0
+        self.earning_ratio = 0
+
+    def print(self):
+        self.hold_days = (self.sell_date - self.buy_date).days
+        print("Stock code: %s, Strategy: %s, Status: %d, Buy date: %s, Sell date: %s, Buy price: %.2f, Sell price: %.2f, Hold days: %d, Earning ratio: %.2f" % 
+            (self.stock_code, self.strategy_name, self.status, self.buy_date, self.sell_date, self.buy_price, self.sell_price, self.hold_days, self.earning_ratio))
+
+class HoldPool:
+    def __init__(self):
+        self.pool = {}
+
+    def add_record(self, record):
+        self.pool[record.stock_code] = record
+
+    def remove_record(self, stock_code):
+        self.pool.pop(stock_code)
+
+    def get_record(self, stock_code):
+        return self.pool.get(stock_code)
+
+    def print(self):
+        for stock_code, record in self.pool.items():
+            record.print()
+
 class StragegyTemplate(bt.Strategy):
     params = (('stop_loss', 0.08),)
-    trade_count = 0
-    succeed_trade_count = 0
+
+    hold_pool = {}
+    history_records = []
+
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
         dt = dt or self.datas[0].datetime.date(0)
@@ -181,9 +218,16 @@ class StragegyTemplate(bt.Strategy):
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
             if order.isbuy():
+                record = StockStatus(order.data._name, self.__class__.__name__)
+                record.status = 1
+                record.buy_date = self.datas[0].datetime.date(0)
+                record.buy_price = order.executed.price
+                self.hold_pool[order.data._name] = record
+
                 self.log(
-                    'BUY EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
-                    (order.executed.price,
+                    'name : %s , BUY EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
+                    (order.data._name,
+                     order.executed.price,
                      order.executed.value,
                      order.executed.comm))
 
@@ -191,17 +235,24 @@ class StragegyTemplate(bt.Strategy):
                 self.buycomm = order.executed.comm
                 self.max_price_from_buy = order.executed.price
             else:  # Sell
-                self.log('SELL EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
-                         (order.executed.price,
+                record = self.hold_pool.get(order.data._name)
+                if record:
+                    record.status = -1
+                    record.sell_date = self.datas[0].datetime.date(0)
+                    record.sell_price = order.executed.price
+                    record.hold_days = len(self)
+                    record.earning_ratio = (record.sell_price - record.buy_price) / record.buy_price
+                    # self.hold_pool[order.data._name] = record
+                    # erase the record from hold pool
+                    self.hold_pool.pop(order.data._name)
+                    self.history_records.append(record)
+                    record.print()
+                self.log('name : %s , SELL EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
+                         (order.data._name,
+                          order.executed.price,
                           order.executed.value,
                           order.executed.comm))
-                if self.buyprice:
-                    self.change_percent = 100 * (order.executed.price - self.buyprice) / self.buyprice
-                    self.change_percent_final += self.change_percent
-                    self.trade_count += 1
-                    if self.change_percent > 0:
-                        self.succeed_trade_count += 1
-                        
+                                        
 
             self.bar_executed = len(self)
             
@@ -214,10 +265,6 @@ class StragegyTemplate(bt.Strategy):
         if not trade.isclosed:
             return
         
-        if self.trade_count > 0:
-            self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f , change_percent: %.2f, change_percent_final: %.2f, success: %d / all %d , acc: %.2f %%' %
-                    (trade.pnl, trade.pnlcomm, self.change_percent, self.change_percent_final, self.succeed_trade_count, self.trade_count, 100 * self.succeed_trade_count / self.trade_count))
-
     def next(self):
         print("This is a template strategy, please implement your own strategy.")
 
