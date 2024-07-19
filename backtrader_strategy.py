@@ -1,6 +1,7 @@
 import backtrader as bt
 import backtrader.feeds as btfeeds
 import datetime
+import numpy as np
 
 from backtrader_indicator import RSRS, RSRS_Norm
 
@@ -197,6 +198,31 @@ class StragegyTemplate(bt.Strategy):
         self.change_percent_final = 0
 
         self.hold_pool = HoldPool()
+
+    def analyze_the_history(self):
+        success_count = 0
+        total_count = len(self.history_records)
+        buy_price_sum = 0
+        sell_price_sum = 0
+        earning_ratio = []
+        for record in self.history_records:
+            record.print()
+            if record.earning_ratio > 0:
+                success_count += 1
+            buy_price_sum += record.buy_price
+            sell_price_sum += record.sell_price
+            earning_ratio.append(record.earning_ratio)
+
+        final_earning_ratio = (sell_price_sum - buy_price_sum) / buy_price_sum
+        print(f"buy price sum: {buy_price_sum}, sell price sum: {sell_price_sum}, earning ratio: {final_earning_ratio}")
+        
+        print(f"Total count: {total_count}, success count: {success_count}, success rate: {success_count / total_count}")
+
+        sharp_ratio = np.mean(earning_ratio) / np.std(earning_ratio)
+        print(f"Sharp ratio: {sharp_ratio}")
+
+    def stop(self):
+        self.analyze_the_history()
 
     def get_final_change_percent(self):
         return self.change_percent_final
@@ -549,8 +575,8 @@ class DoubleEmaStrategy(StragegyTemplate):
 
 class NewHighStrategy(StragegyTemplate):
     params = (
-        ('highest_window', 20),
-        ('lowest_window', 8),
+        ('highest_window', 30),
+        ('lowest_window', 10),
         ('ema_period', 120),
         ('ema_sell_period', 50)
     )

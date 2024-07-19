@@ -46,6 +46,7 @@ def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100
     print('max Draw Down:', results[0].analyzers.drawdown.get_analysis()['max'])
     print('return:', results[0].analyzers.returns.get_analysis()['rnorm100'])
 
+    
     # Print the profit
     profit = cerebro.broker.getvalue() - cash
 
