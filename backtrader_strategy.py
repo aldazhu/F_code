@@ -24,10 +24,10 @@ class MyMinutelyData(btfeeds.GenericCSVData):
     params = (
         ('fromdate', datetime.datetime(2022, 11, 1)),
         ('todate', datetime.datetime(2023, 12, 31)),
-        ('dtformat', ('%Y-%m-%dT%H%M%S')),
-        # ('tmformat', ('%H.%M.%S')),
-        ('datetime', 1), # 20220104103000000
-        ('time', 2),
+        ('dtformat', ('%Y%m%d%H%M%S%f')),
+        # ('tmformat', ('%Y%m%d%H%M%S%f')),
+        ('datetime', 2), # 20220104103000000
+        # ('time', 2),
         ('open', 4),
         ('high', 5),
         ('low', 6),
@@ -133,7 +133,8 @@ class StragegyTemplate(bt.Strategy):
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
         dt = dt or self.datas[0].datetime.date(0)
-        print('%s, %s' % (dt.isoformat(), txt))
+        time = self.datas[0].datetime.time(0)
+        print('%s T %s, %s' % (dt.isoformat(),time, txt))
 
     def __init__(self):
         # Keep a reference to the "close" line in the data[0] dataseries
@@ -489,15 +490,16 @@ class DoubleEmaStrategy(StragegyTemplate):
 
 class NewHighStrategy(StragegyTemplate):
     params = (
-        ('window', 20),
-        ('ema_period', 50),
+        ('highest_window', 20),
+        ('lowest_window', 5),
+        ('ema_period', 120),
         ('ema_sell_period', 50)
     )
 
     def __init__(self):
         super().__init__()
-        self.high = bt.indicators.Highest(self.datas[0].high, period=self.params.window)
-        self.low = bt.indicators.Lowest(self.datas[0].low, period=self.params.window)
+        self.high = bt.indicators.Highest(self.datas[0].high, period=self.params.highest_window)
+        self.low = bt.indicators.Lowest(self.datas[0].low, period=self.params.lowest_window)
         self.ema = bt.indicators.ExponentialMovingAverage(self.datas[0], period=self.params.ema_period)
         self.sell_ema = bt.indicators.ExponentialMovingAverage(self.datas[0], period=self.params.ema_sell_period)
 
@@ -509,9 +511,12 @@ class NewHighStrategy(StragegyTemplate):
             if self.dataclose[0] > self.high[-1] and self.dataclose[0] > self.ema[0]:
                 self.order = self.buy()
         else:  # in the market
-            if self.dataclose[0] < self.low[-1] or self.dataclose[0] < self.high[-1] * (1 - 0.20) or self.dataclose[0] < self.sell_ema[0]:
-                self.order = self.sell()
+            if self.dataclose[0] < self.low[-1] :
+                pass
+                # self.order = self.sell()
 
+        if self.position:
+            self.stop_loss_watch_dog(self.data_close[0])
 class MACDTrendFollowingStrategy(StragegyTemplate):
     params = (('macd1', 12), ('macd2', 26), ('macdsig', 14),)
 

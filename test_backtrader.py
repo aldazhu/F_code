@@ -74,13 +74,13 @@ def get_minutely_data(data_name, from_date, to_date):
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    # data_name = 'data_hour/sz.300628.csv'
-    data_name = 'data_index/sh.000300.csv'
+    data_name = 'data_hour/sz.300628.csv'
+    # data_name = 'data_index/sh.000300.csv'
     from_date = datetime.datetime(2016, 1, 1)
     to_date = datetime.datetime(2024, 12, 31)
-    data = get_data(data_name, from_date, to_date)
-    # data = get_minutely_data(data_name, from_date, to_date)
-    stake = 1
+    # data = get_data(data_name, from_date, to_date)
+    data = get_minutely_data(data_name, from_date, to_date)
+    stake = 100
 
     # test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=stake)
 
@@ -88,7 +88,9 @@ def demo_of_simple_strategy():
 
     # test_backtrader(data, strategy=RSIStrategy, cash=100000.0, commission=0.001, stake=stake)
 
-    test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=stake)
+    # test_backtrader(data, strategy=CCIStrategy, cash=100000.0, commission=0.001, stake=stake)
+
+    test_backtrader(data, strategy=NewHighStrategy, cash=100000.0, commission=0.001, stake=stake)
 
     # test_backtrader(data, strategy=CombinedIndicatorStrategy, cash=100000.0, commission=0.001, stake=stake)
 
@@ -109,6 +111,7 @@ def demo_of_multiple_data():
         file = os.path.join(data_root, item)
         print(f"Processing {file} ...")
         data = get_data(file, from_date, to_date)
+        # data = get_minutely_data(file, from_date, to_date)
         try:
 
             # gain = test_backtrader(data, strategy=MovingAverageStrategy, cash=100000.0, commission=0.001, stake=stake) # -525427
