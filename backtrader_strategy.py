@@ -1,6 +1,7 @@
 import backtrader as bt
 import backtrader.feeds as btfeeds
 import datetime
+import numpy as np
 
 from backtrader_indicator import RSRS, RSRS_Norm
 
@@ -24,10 +25,10 @@ class MyMinutelyData(btfeeds.GenericCSVData):
     params = (
         ('fromdate', datetime.datetime(2022, 11, 1)),
         ('todate', datetime.datetime(2023, 12, 31)),
-        ('dtformat', ('%Y-%m-%dT%H%M%S')),
-        # ('tmformat', ('%H.%M.%S')),
-        ('datetime', 1), # 20220104103000000
-        ('time', 2),
+        ('dtformat', ('%Y%m%d%H%M%S%f')),
+        # ('tmformat', ('%Y%m%d%H%M%S%f')),
+        ('datetime', 2), # 20220104103000000
+        # ('time', 2),
         ('open', 4),
         ('high', 5),
         ('low', 6),
@@ -128,12 +129,59 @@ class QuickGuideStrategy(bt.Strategy):
                 # Keep track of the created order to avoid a 2nd order
                 self.order = self.sell()
 
+# a class of stock data , buy, sell, hold days, earning ratio etc
+class StockStatus:
+    def __init__(self, stock_code, strategy_name):
+        self.stock_code = stock_code
+        self.strategy_name = strategy_name
+        self.status = 0
+        self.buy_date = ""
+        self.sell_date = ""
+        self.buy_price = 0
+        self.sell_price = 0
+        self.hold_days = 0
+        self.earning_ratio = 0
+
+    def print(self):
+        self.hold_days = (self.sell_date - self.buy_date).days
+        print(
+            f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status}", 
+            f"Buy date: {self.buy_date}, Buy price: {self.buy_price} ", 
+            f"Sell date: {self.sell_date},Sell price: {self.sell_price}",
+            f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
+            )
+
+class HoldPool:
+    def __init__(self):
+        self.pool = {}
+
+    def add_record(self, record):
+        """
+        args:
+            record: StockStatus
+        """
+        self.pool[record.stock_code] = record
+
+    def remove_record(self, stock_code):
+        self.pool.pop(stock_code)
+
+    def get_record(self, stock_code):
+        return self.pool.get(stock_code)
+
+    def print(self):
+        for stock_code, record in self.pool.items():
+            record.print()
+
 class StragegyTemplate(bt.Strategy):
     params = (('stop_loss', 0.08),)
+
+    history_records = []
+
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
         dt = dt or self.datas[0].datetime.date(0)
-        print('%s, %s' % (dt.isoformat(), txt))
+        time = self.datas[0].datetime.time(0)
+        print('%s T %s, %s' % (dt.isoformat(),time, txt))
 
     def __init__(self):
         # Keep a reference to the "close" line in the data[0] dataseries
@@ -149,8 +197,32 @@ class StragegyTemplate(bt.Strategy):
         self.change_percent = 0
         self.change_percent_final = 0
 
-        self.trade_count = 0
-        self.succeed_trade_count = 0
+        self.hold_pool = HoldPool()
+
+    def analyze_the_history(self):
+        success_count = 0
+        total_count = len(self.history_records)
+        buy_price_sum = 0
+        sell_price_sum = 0
+        earning_ratio = []
+        for record in self.history_records:
+            record.print()
+            if record.earning_ratio > 0:
+                success_count += 1
+            buy_price_sum += record.buy_price
+            sell_price_sum += record.sell_price
+            earning_ratio.append(record.earning_ratio)
+
+        final_earning_ratio = (sell_price_sum - buy_price_sum) / buy_price_sum
+        print(f"buy price sum: {buy_price_sum}, sell price sum: {sell_price_sum}, earning ratio: {final_earning_ratio}")
+        
+        print(f"Total count: {total_count}, success count: {success_count}, success rate: {success_count / total_count}")
+
+        sharp_ratio = np.mean(earning_ratio) / np.std(earning_ratio)
+        print(f"Sharp ratio: {sharp_ratio}")
+
+    def stop(self):
+        self.analyze_the_history()
 
     def get_final_change_percent(self):
         return self.change_percent_final
@@ -178,9 +250,16 @@ class StragegyTemplate(bt.Strategy):
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
             if order.isbuy():
+                record = StockStatus(order.data._name, self.__class__.__name__)
+                record.status = 1
+                record.buy_date = self.datas[0].datetime.date(0)
+                record.buy_price = order.executed.price
+                self.hold_pool.add_record(record)
+
                 self.log(
-                    'BUY EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
-                    (order.executed.price,
+                    'name : %s , BUY EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
+                    (order.data._name,
+                     order.executed.price,
                      order.executed.value,
                      order.executed.comm))
 
@@ -188,18 +267,24 @@ class StragegyTemplate(bt.Strategy):
                 self.buycomm = order.executed.comm
                 self.max_price_from_buy = order.executed.price
             else:  # Sell
-                self.log('SELL EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
-                         (order.executed.price,
+                record = self.hold_pool.get_record(order.data._name)
+                if record:
+                    record.status = -1
+                    record.sell_date = self.datas[0].datetime.date(0)
+                    record.sell_price = order.executed.price
+                    record.hold_days = len(self)
+                    record.earning_ratio = (record.sell_price - record.buy_price) / record.buy_price
+                    record.print()
+                    # self.hold_pool[order.data._name] = record
+                    # erase the record from hold pool
+                    self.hold_pool.remove_record(order.data._name)
+                    self.history_records.append(record)
+                    
+                self.log('name : %s , SELL EXECUTED, Price: %.2f, Cost: %.2f, Comm %.2f' %
+                         (order.data._name,
+                          order.executed.price,
                           order.executed.value,
                           order.executed.comm))
-                if self.buyprice:
-                    self.change_percent = 100 * (order.executed.price - self.buyprice) / self.buyprice
-                    self.change_percent_final += self.change_percent
-                    self.trade_count += 1
-                    if self.change_percent > 0:
-                        self.succeed_trade_count += 1
-                        
-
             self.bar_executed = len(self)
             
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
@@ -211,9 +296,6 @@ class StragegyTemplate(bt.Strategy):
         if not trade.isclosed:
             return
         
-        self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f , change_percent: %.2f, change_percent_final: %.2f, success: %d / all %d , acc: %.2f %%' %
-                 (trade.pnl, trade.pnlcomm, self.change_percent, self.change_percent_final, self.succeed_trade_count, self.trade_count, 100 * self.succeed_trade_count / self.trade_count))
-
     def next(self):
         print("This is a template strategy, please implement your own strategy.")
 
@@ -223,8 +305,9 @@ class MovingAverageStrategy(StragegyTemplate):
     params = (('ma_period', 15), ) # class variable , can be accessed by self.params.ma_period
     def __init__(self):
         super().__init__()
-        self.ma = bt.indicators.SimpleMovingAverage(
-            self.datas[0], period=self.params.ma_period)
+        self.ma = []
+        for i, data in enumerate(self.datas):
+            self.ma.append(bt.indicators.SimpleMovingAverage(data.close, period=self.params.ma_period))
         
     def next(self):
         # check if there is an unfinished order
@@ -232,78 +315,70 @@ class MovingAverageStrategy(StragegyTemplate):
             return
 
         # check if in the market
-        if not self.position:
-            # if the closing price is above the moving average, buy
-            if self.data_close[0] > self.ma[0]:
-                self.order = self.buy()
-        else:
-            # if the closing price is below the moving average, sell
-            if self.data_close[0] < self.ma[0]:
-                self.order = self.sell()
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0:
+                # if the closing price is above the moving average, buy
+                if data.close[0] > self.ma[i][0]:
+                    self.order = self.buy(data)
+            else:
+                # if the closing price is below the moving average, sell
+                if data.close[0] < self.ma[i][0]:
+                    self.order = self.sell(data)
         
-        # if self.position:
-        #     self.stop_loss_watch_dog(self.data_close[0])
 
 class RSIStrategy(StragegyTemplate):
     params = (('rsi_period', 15), ('rsi_upper', 70), ('rsi_lower', 30),('high_period', 20),('stop_loss', 0.2))
     def __init__(self):
         super().__init__()
-        self.min_price = 0.0
-        self.rsi = bt.indicators.RSI(self.datas[0].close, period=self.params.rsi_period)
-        self.highest = bt.indicators.Highest(self.datas[0].high, period=self.params.high_period)
-        
+        self.min_price = []
+        self.rsi = []
+        self.highest = []
+        for i, data in enumerate(self.datas):
+            self.min_price.append(bt.indicators.Lowest(data.low, period=self.params.high_period))
+            self.rsi.append(bt.indicators.RSI(data.close, period=self.params.rsi_period))
+            self.highest.append(bt.indicators.Highest(data.high, period=self.params.high_period))
+
     def next(self):
-        change = self.dataclose[0] - self.dataclose[-1]
-        change_percent = change / self.dataclose[-1] * 100
+        
         # self.log("Close: %.2f, RSI: %.2f, Change percent: %.2f" % (self.dataclose[0], self.rsi[0], change_percent) )
         # check if there is an unfinished order
         if self.order:
             return
 
-        # check if in the market
-        if self.position.size > 0:
-            # if the RSI is above the upper bound, sell
-            if self.rsi[0] <= self.params.rsi_upper and self.rsi[-1] > self.params.rsi_upper:
-                self.order = self.sell()
-            # elif self.dataclose[0] < self.highest[-1] * (1 - self.params.stop_loss):
-            #     self.order = self.sell()
-            
-        else:
-            # if the RSI is below the lower bound, buy
-            if self.rsi[0] >= self.params.rsi_lower and self.rsi[-1] < self.params.rsi_lower:
-                self.order = self.buy()
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size > 0:
+                if self.rsi[i][0] < self.params.rsi_upper and self.rsi[i][-1] >= self.params.rsi_upper:
+                    self.order = self.sell(data)
+            else:
+                if self.rsi[i][0] > self.params.rsi_lower and self.rsi[i][-1] <= self.params.rsi_lower:
+                    self.order = self.buy(data)
         
-        if self.position:
-            self.stop_loss_watch_dog(self.data_close[0])
 
 class CCIStrategy(StragegyTemplate):
     params = (('cci_period', 15), ('cci_upper', 150), ('cci_lower', -150), ('high_period', 20),)
     def __init__(self):
         super().__init__()
-        self.cci = bt.indicators.CCI(self.datas[0], period=self.params.cci_period)
-        self.high = bt.indicators.Highest(self.datas[0].high, period=self.params.high_period)
+        self.cci = []
+        self.highest = []
+        for i, data in enumerate(self.datas):
+            self.cci.append(bt.indicators.CCI(data, period=self.params.cci_period))
+            self.highest.append(bt.indicators.Highest(data.high, period=self.params.high_period))
+
+        
         
     def next(self):
-        change = self.dataclose[0] - self.dataclose[-1]
-        change_percent = change / self.dataclose[-1] * 100
-        # self.log("Close: %.2f, CCI: %.2f, Change percent: %.2f" % (self.dataclose[0], self.cci[0], change_percent) )
+        
         # check if there is an unfinished order
         if self.order:
             return
 
-        # check if in the market
-        if self.position.size > 0:
-            # if the CCI is above the upper bound, sell
-            if self.cci[0] < self.params.cci_upper and self.cci[-1] >= self.params.cci_upper:
-                self.order = self.sell()
-            elif self.dataclose[0] < self.high[-1] * 0.80:
-                self.order = self.sell()
-                
-        else:
-            # if the CCI is below the lower bound, buy
-            if self.cci[0] > self.params.cci_lower and self.cci[-1] <= self.params.cci_lower:
-                self.order = self.buy()
-        
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size > 0:
+                if self.cci[i][0] < self.params.cci_upper and self.cci[i][-1] >= self.params.cci_upper:
+                    self.order = self.sell(data)
+            else:
+                if self.cci[i][0] > self.params.cci_lower and self.cci[i][-1] <= self.params.cci_lower:
+                    self.order = self.buy(data)
         
                 
 
@@ -450,21 +525,26 @@ class CombinedIndicatorStrategy(StragegyTemplate):
 
     def __init__(self):
         super().__init__()
-        self.ma = bt.indicators.SimpleMovingAverage(self.datas[0], period=self.params.ma_period)
-        self.rsi = bt.indicators.RelativeStrengthIndex(self.datas[0], period=self.params.rsi_period)
-        self.cci = bt.indicators.CommodityChannelIndex(self.datas[0], period=self.params.cci_period)
+        self.ma = []
+        self.rsi = []
+        self.cci = []
+        for i, data in enumerate(self.datas):
+            self.ma.append(bt.indicators.SimpleMovingAverage(data.close, period=self.params.ma_period))
+            self.rsi.append(bt.indicators.RSI(data.close, period=self.params.rsi_period))
+            self.cci.append(bt.indicators.CCI(data, period=self.params.cci_period))
 
     def next(self):
         if self.order:
             return
 
-        if self.position.size <= 0:  # not in the market
-            if (self.cci[0] < self.params.cci_lower or self.rsi[0] < self.params.rsi_lower) :
-                self.order = self.buy()
-        else:  # in the market
-            if self.cci[0] > self.params.cci_upper or self.rsi[0] > self.params.rsi_upper :
-                self.order = self.sell()
-
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0:
+                if self.rsi[i][0] < self.params.rsi_lower or self.cci[i][0] < self.params.cci_lower:
+                    self.order = self.buy(data)
+            else:
+                if self.rsi[i][0] > self.params.rsi_upper or self.cci[i][0] > self.params.cci_upper:
+                    self.order = self.sell(data)
+        
 class DoubleEmaStrategy(StragegyTemplate):
     params = (
         ('fast_ema_period', 7),
@@ -473,64 +553,86 @@ class DoubleEmaStrategy(StragegyTemplate):
 
     def __init__(self):
         super().__init__()
-        self.fast_ema = bt.indicators.ExponentialMovingAverage(self.datas[0], period=self.params.fast_ema_period)
-        self.slow_ema = bt.indicators.ExponentialMovingAverage(self.datas[0], period=self.params.slow_ema_period)
+
+        self.fast_ema = []
+        self.slow_ema = []
+        for i, data in enumerate(self.datas):
+            self.fast_ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.fast_ema_period))
+            self.slow_ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.slow_ema_period))
+
 
     def next(self):
         if self.order:
             return
 
-        if not self.position:  # not in the market
-            if self.fast_ema[0] > self.slow_ema[0] and self.fast_ema[-1] < self.slow_ema[-1]:
-                self.order = self.buy()
-        else:  # in the market
-            if self.fast_ema[0] < self.slow_ema[0] and self.fast_ema[-1] > self.slow_ema[-1]:
-                self.order = self.sell()
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0:
+                if self.fast_ema[i][0] > self.slow_ema[i][0] and self.fast_ema[i][-1] < self.slow_ema[i][-1]:
+                    self.order = self.buy(data)
+            else:
+                if self.fast_ema[i][0] < self.slow_ema[i][0] and self.fast_ema[i][-1] > self.slow_ema[i][-1]:
+                    self.order = self.sell(data)
 
 class NewHighStrategy(StragegyTemplate):
     params = (
-        ('window', 20),
-        ('ema_period', 50),
+        ('highest_window', 30),
+        ('lowest_window', 10),
+        ('ema_period', 120),
         ('ema_sell_period', 50)
     )
 
     def __init__(self):
         super().__init__()
-        self.high = bt.indicators.Highest(self.datas[0].high, period=self.params.window)
-        self.low = bt.indicators.Lowest(self.datas[0].low, period=self.params.window)
-        self.ema = bt.indicators.ExponentialMovingAverage(self.datas[0], period=self.params.ema_period)
-        self.sell_ema = bt.indicators.ExponentialMovingAverage(self.datas[0], period=self.params.ema_sell_period)
+        self.high = []
+        self.low = []
+        self.ema = []
+        self.ema_sell = []
+        for i, data in enumerate(self.datas):
+            self.high.append(bt.indicators.Highest(data.high, period=self.params.highest_window))
+            self.low.append(bt.indicators.Lowest(data.low, period=self.params.lowest_window))
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema_sell.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_sell_period))
 
     def next(self):
         if self.order:
             return
 
-        if not self.position:  # not in the market
-            if self.dataclose[0] > self.high[-1] and self.dataclose[0] > self.ema[0]:
-                self.order = self.buy()
-        else:  # in the market
-            if self.dataclose[0] < self.low[-1] or self.dataclose[0] < self.high[-1] * (1 - 0.20) or self.dataclose[0] < self.sell_ema[0]:
-                self.order = self.sell()
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0:
+                if data.close[0] > self.high[i][-1] :
+                    print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
+                    self.order = self.buy(data)
+            else:
+                if data.close[0] < self.low[i][-1] :
+                    print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
+                    self.order = self.sell(data)
 
+        
 class MACDTrendFollowingStrategy(StragegyTemplate):
-    params = (('macd1', 12), ('macd2', 26), ('macdsig', 14),)
+    params = (('macd1', 12), ('macd2', 26), ('macdsig', 14), ('highest_window', 20),)
 
     def __init__(self):
         super().__init__()
-        self.macd = bt.indicators.MACD(self.data.close, period_me1=self.params.macd1, period_me2=self.params.macd2, period_signal=self.params.macdsig)
-        self.crossover = bt.indicators.CrossOver(self.macd.macd, self.macd.signal)
-        self.highest = bt.indicators.Highest(self.datas[0].high, period=20)
+        self.macd = []
+        self.crossover = []
+        self.highest = []
+        for i, data in enumerate(self.datas):
+            self.macd.append(bt.indicators.MACD(data.close, period_me1=self.params.macd1, period_me2=self.params.macd2, period_signal=self.params.macdsig))
+            self.crossover.append(bt.indicators.CrossOver(self.macd[i].macd, self.macd[i].signal))
+            self.highest.append(bt.indicators.Highest(data.high, period=self.params.highest_window))
+
 
     def next(self):
         if self.order:
             return
         
-        if not self.position:
-            if self.crossover > 0 and self.dataclose[0] > self.highest[-1]:
-                self.order = self.buy()
-        else:
-            if self.crossover < 0 or self.dataclose[0] < self.highest[-1] * 0.80:
-                self.order = self.sell()
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0:
+                if self.crossover[i] > 0 and data.close[0] > self.highest[-1]:
+                    self.order = self.buy(data)
+            else:
+                if self.crossover[i] < 0 or data.close[0] < self.highest[-1] * 0.80:
+                    self.order = self.sell(data)
 
 
 class BollingerBandsStrategy(StragegyTemplate):
@@ -538,18 +640,22 @@ class BollingerBandsStrategy(StragegyTemplate):
 
     def __init__(self):
         super().__init__()
-        self.boll = bt.indicators.BollingerBands(self.datas[0], period=self.params.period, devfactor=self.params.devfactor)
-
+        self.boll = []
+        for i, data in enumerate(self.datas):
+            self.boll.append(bt.indicators.BollingerBands(data, period=self.params.period, devfactor=self.params.devfactor))
+        
     def next(self):
         if self.order:
             return
 
-        if not self.position:
-            if self.dataclose[0] <= self.boll.lines.bot and self.dataclose[-1] > self.boll.lines.bot:
-                self.order = self.buy()
-        else:
-            if self.dataclose[0] >= self.boll.lines.top and self.dataclose[-1] < self.boll.lines.top:
-                self.order = self.sell()
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0:
+                if data.close[-1] <= self.boll[i].lines.bot and data.close[0] > self.boll[i].lines.bot:
+                    self.order = self.buy(data)
+            else:
+                if data.close[-1] >= self.boll[i].lines.top and data.close[0] < self.boll[i].lines.top:
+                    self.order = self.sell(data)
+
         
 
 class RSRSStrategy(StragegyTemplate):
@@ -557,19 +663,27 @@ class RSRSStrategy(StragegyTemplate):
 
     def __init__(self):
         super().__init__()
-        self.rsrs = RSRS(self.datas[0])
-        self.rsrs_norm = RSRS_Norm(self.datas[0])
-        self.rsrs_r2 = self.rsrs_norm * self.rsrs.R2
-        self.beta_right = self.rsrs * self.rsrs_r2
+
+        self.rsrs = []
+        self.rsrs_norm = []
+        self.rsrs_r2 = []
+        self.beta_right = []
+        for i, data in enumerate(self.datas):
+            self.rsrs.append(RSRS(data))
+            self.rsrs_norm.append(RSRS_Norm(data))
+            self.rsrs_r2.append(self.rsrs_norm[i] * self.rsrs[i].R2)
+            self.beta_right.append(self.rsrs[i] * self.rsrs_r2[i])
 
     def next(self):
         if self.order:
             return
 
         # print(f"{self.datas[0].datetime.date(0)}, beta_right: {self.beta_right[0]}, rsrs_norm: {self.rsrs_norm[0]}, rsrs_r2: {self.rsrs_r2[0]}")
-        if not self.position:
-            if self.rsrs_norm[0] > self.params.rsrs_norm_thresh:
-                self.order = self.buy()
-        else:
-            if self.rsrs_norm[0] < - self.params.rsrs_norm_thresh:
-                self.order = self.sell()
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0:
+                if self.rsrs_norm[i][0] > self.params.rsrs_norm_thresh:
+                    self.order = self.buy(data)
+            else:
+                if self.rsrs_norm[i][0] < - self.params.rsrs_norm_thresh:
+                    self.order = self.sell(data)
+
