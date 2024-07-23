@@ -76,6 +76,26 @@ def get_minutely_data(data_name, from_date, to_date):
                 todate=to_date)
     return data
 
+
+def demo_of_ShortTermReversalEffectinStocks():
+    data_root = 'data'
+    from_date = datetime.datetime(2016, 1, 1)
+    to_date = datetime.datetime(2024, 12, 31)
+    data_names = [os.path.join(data_root, item) for item in os.listdir(data_root)]
+    if "hour" in data_names[0]:
+        datas = [get_minutely_data(data_name, from_date, to_date) for data_name in data_names]
+    else:
+        datas = [get_data(data_name, from_date, to_date) for data_name in data_names]
+
+    stake = 100
+
+    strategies = [
+        ShortTermReversalEffectinStocks
+    ]
+
+    test_backtrader(datas, strategies=strategies, cash=100000.0, commission=0.001, stake=stake)
+
+
 def demo_of_simple_strategy():
     # Create a Data Feed
     data_root = "data"
@@ -108,7 +128,7 @@ def demo_of_simple_strategy():
     else:
         datas = [get_data(data_name, from_date, to_date) for data_name in data_names]
 
-    stake = 100
+    stake = 1
 
     strategies = [
         NewHighStrategy ,# ok
@@ -217,3 +237,4 @@ if __name__ == '__main__':
     demo_of_simple_strategy()
     # demo_of_multiple_data()
     # demo_of_multiple_stock()
+    # demo_of_ShortTermReversalEffectinStocks()

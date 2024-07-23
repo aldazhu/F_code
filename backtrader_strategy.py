@@ -2,6 +2,7 @@ import backtrader as bt
 import backtrader.feeds as btfeeds
 import datetime
 import numpy as np
+import matplotlib.pyplot as plt
 
 from backtrader_indicator import RSRS, RSRS_Norm
 
@@ -173,7 +174,7 @@ class HoldPool:
             record.print()
 
 class StragegyTemplate(bt.Strategy):
-    params = (('stop_loss', 0.08),)
+    params = (('stop_loss', 0.55), ('stop_earning', 0.65))
 
     history_records = []
 
@@ -199,6 +200,24 @@ class StragegyTemplate(bt.Strategy):
 
         self.hold_pool = HoldPool()
 
+    def stop_loss_watch_dog(self):
+        for i, data in enumerate(self.datas):
+            if data._name in self.hold_pool.pool:
+                record = self.hold_pool.get_record(data._name)
+                if record:
+                    if record.buy_price * (1 - self.params.stop_loss) > data.close[0]:
+                        self.order = self.sell(data)
+                        self.log(f"Stop loss triggered, sell the {data._name} ")
+                        
+    def stop_eaning_watch_dog(self):
+        for i, data in enumerate(self.datas):
+            if data._name in self.hold_pool.pool:
+                record = self.hold_pool.get_record(data._name)
+                if record:
+                    if record.buy_price * (1 + self.params.stop_earning) < data.close[0]:
+                        self.order = self.sell(data)
+                        self.log(f"Stop earning triggered, sell the {data._name}, today's price: {data.close[0]}")
+   
     def analyze_the_history(self):
         success_count = 0
         total_count = len(self.history_records)
@@ -221,26 +240,25 @@ class StragegyTemplate(bt.Strategy):
         sharp_ratio = np.mean(earning_ratio) / np.std(earning_ratio)
         print(f"Sharp ratio: {sharp_ratio}")
 
+        # plot holding days and earning ratio
+        holding_days = [record.hold_days for record in self.history_records]
+        earning_ratio = [record.earning_ratio for record in self.history_records]
+        
+        days = np.array(holding_days)
+        ratio = np.array(earning_ratio)
+        plt.scatter(days, ratio)
+        plt.xlabel('Holding days')
+        plt.ylabel('Earning ratio')
+        plt.show()
+
+
     def stop(self):
         self.analyze_the_history()
 
     def get_final_change_percent(self):
         return self.change_percent_final
-
-    def stop_loss_watch_dog(self, price):
-        if self.position.size > 0:
-            if self.data_high[0] > self.max_price_from_buy:
-                self.max_price_from_buy = self.data_high[0]
-
-        else:
-            self.max_price_from_buy = 0 
-
-        if self.max_price_from_buy:
-            if price < self.max_price_from_buy * (1 - self.params.stop_loss):
-                self.log("Stop loss triggered, sell at price: %.2f" % price)
-                if self.position.size > 0:
-                    self.order = self.sell()
-
+    
+    
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
             # Buy/Sell order submitted/accepted to/by broker - Nothing to do
@@ -575,10 +593,10 @@ class DoubleEmaStrategy(StragegyTemplate):
 
 class NewHighStrategy(StragegyTemplate):
     params = (
-        ('highest_window', 30),
+        ('highest_window', 20),
         ('lowest_window', 10),
         ('ema_period', 120),
-        ('ema_sell_period', 50)
+        ('ema_sell_period', 10)
     )
 
     def __init__(self):
@@ -598,14 +616,18 @@ class NewHighStrategy(StragegyTemplate):
             return
 
         for i, data in enumerate(self.datas):
-            if self.getposition(data).size <= 0:
-                if data.close[0] > self.high[i][-1] :
+            if self.getposition(data).size <= 0 :
+                if data.close[0] > self.high[i][-1] and data.close[0] > self.ema[i][0]:
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
             else:
-                if data.close[0] < self.low[i][-1] :
+                if data.close[0] < self.low[i][-1] or data.close[0] < self.ema_sell[i][0] :
                     print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
                     self.order = self.sell(data)
+        # stop loss
+        self.stop_loss_watch_dog()
+        self.stop_eaning_watch_dog()
+
 
         
 class MACDTrendFollowingStrategy(StragegyTemplate):
@@ -687,3 +709,71 @@ class RSRSStrategy(StragegyTemplate):
                 if self.rsrs_norm[i][0] < - self.params.rsrs_norm_thresh:
                     self.order = self.sell(data)
 
+# this strategy is based on the following code: 
+# https://github.com/paperswithbacktest/awesome-systematic-trading/blob/main/static/strategies/short-term-reversal-in-stocks.py
+# This strategy is based on the short-term reversal effect in stocks. The main idea is that stocks that
+# have performed poorly in the past may perform well in the future, and stocks that have performed well 
+# in the past may perform poorly in the future.
+
+# The specific implementation steps are as follows:
+
+# First, the strategy selects the 500 stocks with the best liquidity as the initial portfolio.
+
+# Then, from these 500 stocks, the 100 stocks with the largest market value are selected.
+
+# For these 100 stocks, the strategy calculates their returns over the past month and sorts them from high to low based on the returns.
+
+# At the same time, the strategy also calculates the returns of these 100 stocks over the past week and sorts them from low to high based on the returns.
+
+# The strategy will buy the 10 worst-performing stocks over the past week (expecting them to rebound in the future) and short the 10 best-performing stocks over the past month (expecting them to fall in the future).
+
+# This portfolio is rebalanced every week, that is, stocks are reselected every week.
+class ShortTermReversalEffectinStocks(StragegyTemplate):
+    params = (
+        ('liquidity_threshold', 100),
+        ('market_value_threshold', 50),
+        ('long_short_threshold', 10),
+        ('rebalance_period', 5),
+    )
+
+    def __init__(self):
+        self.liquidity = []
+        self.month_return = []
+        self.week_return = []
+        self.market_value = []
+        # self.month
+        # self.week
+        self.rebalance_period = self.params.rebalance_period
+        self.rebalance_counter = 0
+
+        for i, data in enumerate(self.datas):
+            self.liquidity.append(data.liquidity)
+            self.market_value.append(data.market_value)
+            self.month_return.append(data.month_return)
+            self.week_return.append(data.week_return)
+
+    def next(self):
+        self.rebalance_counter += 1
+        if self.rebalance_counter % self.rebalance_period == 0:
+            self.rebalance_counter = 0
+            self.rebalance()
+
+    def rebalance(self):
+        # select the 500 stocks with the best liquidity as the initial portfolio
+        self.liquidity = sorted(self.datas, key=lambda x: x.liquidity, reverse=True)[:self.params.liquidity_threshold]
+        # select the 100 stocks with the largest market value
+        self.market_value = sorted(self.liquidity, key=lambda x: x.market_value, reverse=True)[:self.params.market_value_threshold]
+        # calculate the returns of these 100 stocks over the past month and sort them from high to low
+        self.month_return = sorted(self.market_value, key=lambda x: x.month_return, reverse=True)
+        # calculate the returns of these 100 stocks over the past week and sort them from low to high
+        self.week_return = sorted(self.market_value, key=lambda x: x.week_return, reverse=False)
+        # buy the 10 worst-performing stocks over the past week and short the 10 best-performing stocks over the past month
+        long_stocks = self.week_return[:self.params.long_short_threshold]
+        short_stocks = self.month_return[:self.params.long_short_threshold]
+        for stock in long_stocks:
+            self.buy(stock)
+        for stock in short_stocks:
+            self.sell(stock)
+            
+        
+        
