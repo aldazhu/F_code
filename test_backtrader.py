@@ -51,7 +51,7 @@ def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100
     profit = cerebro.broker.getvalue() - cash
 
     # Visulize the result
-    # cerebro.plot()
+    cerebro.plot()
 
     return profit
 
@@ -78,7 +78,7 @@ def get_minutely_data(data_name, from_date, to_date):
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    data_root = "data"
+    data_root = "data_index"
     test_all_data = True
 
     data_names = [
@@ -108,7 +108,7 @@ def demo_of_simple_strategy():
     else:
         datas = [get_data(data_name, from_date, to_date) for data_name in data_names]
 
-    stake = 100
+    stake = 1
 
     strategies = [
         NewHighStrategy ,# ok

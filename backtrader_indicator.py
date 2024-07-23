@@ -34,3 +34,19 @@ class RSRS_Norm(bt.Indicator):
         self.lines.beta_right = self.rsrs * self.lines.rsrs_r2
 
 
+class Diff(bt.Indicator):
+    """current (close price - ema(close price, period)) / ema(close price, period)
+
+    Args:
+        bt (_type_): _description_
+    """ 
+    lines = ('diff',)
+    params = (('ema_period', 30),)
+    def __init__(self):
+        self.emas = bt.indicators.EMA(self.data.close, period=self.p.ema_period)
+        self.diff = (self.data.close - self.emas) / self.emas
+    def next(self):
+        self.lines.diff[0] = self.diff[0]
+
+    
+    

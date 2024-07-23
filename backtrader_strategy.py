@@ -3,7 +3,7 @@ import backtrader.feeds as btfeeds
 import datetime
 import numpy as np
 
-from backtrader_indicator import RSRS, RSRS_Norm
+from backtrader_indicator import RSRS, RSRS_Norm, Diff
 
 class MyData(btfeeds.GenericCSVData):
     params = (
@@ -213,6 +213,9 @@ class StragegyTemplate(bt.Strategy):
             sell_price_sum += record.sell_price
             earning_ratio.append(record.earning_ratio)
 
+        if total_count == 0:
+            print("No record to analyze")
+            return
         final_earning_ratio = (sell_price_sum - buy_price_sum) / buy_price_sum
         print(f"buy price sum: {buy_price_sum}, sell price sum: {sell_price_sum}, earning ratio: {final_earning_ratio}")
         
@@ -364,8 +367,6 @@ class CCIStrategy(StragegyTemplate):
             self.cci.append(bt.indicators.CCI(data, period=self.params.cci_period))
             self.highest.append(bt.indicators.Highest(data.high, period=self.params.high_period))
 
-        
-        
     def next(self):
         
         # check if there is an unfinished order
@@ -578,7 +579,7 @@ class NewHighStrategy(StragegyTemplate):
         ('highest_window', 30),
         ('lowest_window', 10),
         ('ema_period', 120),
-        ('ema_sell_period', 50)
+        ('ema_sell_period', 10)
     )
 
     def __init__(self):
@@ -587,11 +588,13 @@ class NewHighStrategy(StragegyTemplate):
         self.low = []
         self.ema = []
         self.ema_sell = []
+        self.diff = [] # high - low
         for i, data in enumerate(self.datas):
             self.high.append(bt.indicators.Highest(data.high, period=self.params.highest_window))
             self.low.append(bt.indicators.Lowest(data.low, period=self.params.lowest_window))
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
             self.ema_sell.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_sell_period))
+            self.diff.append(Diff(data,ema_period=self.params.ema_period))
 
     def next(self):
         if self.order:
@@ -599,11 +602,11 @@ class NewHighStrategy(StragegyTemplate):
 
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0:
-                if data.close[0] > self.high[i][-1] :
+                if data.close[0] > self.high[i][-1] and self.diff[i][0] > 0:
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
             else:
-                if data.close[0] < self.low[i][-1] :
+                if data.close[0] < self.low[i][-1] or data.close[0] < self.ema_sell[i][0]:
                     print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
                     self.order = self.sell(data)
 
