@@ -132,6 +132,7 @@ def demo_of_simple_strategy():
 
     strategies = [
         NewHighStrategy ,# ok
+        # NewLowStrategy, # ok
         # MovingAverageStrategy, # ok
         # CombinedIndicatorStrategy, # ok
         # RSIStrategy, # ok

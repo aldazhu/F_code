@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from backtrader_indicator import RSRS, RSRS_Norm
+from my_logger import logger
 
 class MyData(btfeeds.GenericCSVData):
     params = (
@@ -146,9 +147,16 @@ class StockStatus:
     def print(self):
         self.hold_days = (self.sell_date - self.buy_date).days
         print(
-            f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status}", 
-            f"Buy date: {self.buy_date}, Buy price: {self.buy_price} ", 
-            f"Sell date: {self.sell_date},Sell price: {self.sell_price}",
+            f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
+            f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
+            f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
+            f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
+            )
+        
+        logger.info(
+            f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
+            f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
+            f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
             f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
             )
 
@@ -174,15 +182,9 @@ class HoldPool:
             record.print()
 
 class StragegyTemplate(bt.Strategy):
-    params = (('stop_loss', 0.55), ('stop_earning', 0.65))
+    params = (('stop_loss', 0.305), ('stop_earning', 0.35))
 
     history_records = []
-
-    def log(self, txt, dt=None):
-        ''' Logging function fot this strategy'''
-        dt = dt or self.datas[0].datetime.date(0)
-        time = self.datas[0].datetime.time(0)
-        print('%s T %s, %s' % (dt.isoformat(),time, txt))
 
     def __init__(self):
         # Keep a reference to the "close" line in the data[0] dataseries
@@ -193,12 +195,21 @@ class StragegyTemplate(bt.Strategy):
         self.buyprice = None
         self.buycomm = None
 
+        self.logger = logger
+
         self.max_price_from_buy = 0
 
         self.change_percent = 0
         self.change_percent_final = 0
 
         self.hold_pool = HoldPool()
+
+    def log(self, txt, dt=None):
+        ''' Logging function fot this strategy'''
+        dt = dt or self.datas[0].datetime.date(0)
+        time = self.datas[0].datetime.time(0)
+        # print('%s T %s, %s' % (dt.isoformat(),time, txt))
+        self.logger.info('%s T %s, %s' % (dt.isoformat(),time, txt))
 
     def stop_loss_watch_dog(self):
         for i, data in enumerate(self.datas):
@@ -233,12 +244,14 @@ class StragegyTemplate(bt.Strategy):
             earning_ratio.append(record.earning_ratio)
 
         final_earning_ratio = (sell_price_sum - buy_price_sum) / buy_price_sum
-        print(f"buy price sum: {buy_price_sum}, sell price sum: {sell_price_sum}, earning ratio: {final_earning_ratio}")
-        
-        print(f"Total count: {total_count}, success count: {success_count}, success rate: {success_count / total_count}")
+        self.logger.info("buy price sum: %s, sell price sum: %s, earning ratio: %s", buy_price_sum, sell_price_sum, final_earning_ratio)
+        # print(f"buy price sum: {buy_price_sum}, sell price sum: {sell_price_sum}, earning ratio: {final_earning_ratio}")
+        self.logger.info("Total count: %s, success count: %s, success rate: %s", total_count, success_count, success_count / total_count)
+        # print(f"Total count: {total_count}, success count: {success_count}, success rate: {success_count / total_count}")
 
         sharp_ratio = np.mean(earning_ratio) / np.std(earning_ratio)
-        print(f"Sharp ratio: {sharp_ratio}")
+        # print(f"Sharp ratio: {sharp_ratio}")
+        self.logger.info("Sharp ratio: %s", sharp_ratio)
 
         # plot holding days and earning ratio
         holding_days = [record.hold_days for record in self.history_records]
@@ -249,6 +262,14 @@ class StragegyTemplate(bt.Strategy):
         plt.scatter(days, ratio)
         plt.xlabel('Holding days')
         plt.ylabel('Earning ratio')
+
+        # plt histgram
+        plt.figure()
+        plt.hist(ratio, bins=50)
+        plt.xlabel('Earning ratio')
+        plt.ylabel('Frequency')
+
+
         plt.show()
 
 
@@ -628,7 +649,43 @@ class NewHighStrategy(StragegyTemplate):
         self.stop_loss_watch_dog()
         self.stop_eaning_watch_dog()
 
+class NewLowStrategy(StragegyTemplate):
+    params = (
+        ('highest_window', 15),
+        ('lowest_window', 25),
+        ('ema_period', 20),
+        ('ema_sell_period', 10)
+    )
 
+    def __init__(self):
+        super().__init__()
+        self.high = []
+        self.low = []
+        self.ema = []
+        self.ema_sell = []
+        for i, data in enumerate(self.datas):
+            self.high.append(bt.indicators.Highest(data.high, period=self.params.highest_window))
+            self.low.append(bt.indicators.Lowest(data.low, period=self.params.lowest_window))
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema_sell.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_sell_period))
+
+    def next(self):
+        if self.order:
+            return
+
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0 :
+                if data.close[0] < self.low[i][-1] :
+                    print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
+                    self.order = self.buy(data)
+            else:
+                hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
+                if data.close[0] > self.high[i][-1] :
+                    print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
+                    self.order = self.sell(data)
+        # stop loss
+        # self.stop_loss_watch_dog()
+        # self.stop_eaning_watch_dog()
         
 class MACDTrendFollowingStrategy(StragegyTemplate):
     params = (('macd1', 12), ('macd2', 26), ('macdsig', 14), ('highest_window', 20),)

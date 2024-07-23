@@ -112,3 +112,65 @@ class RSIStrategy(StragegyTemplate):
 Total gain: 63572.84902108788
 169 / 298 acc: 0.5671140939597316
 ```
+
+## 4. new low
+```python
+class NewLowStrategy(StragegyTemplate):
+    params = (
+        ('highest_window', 15),
+        ('lowest_window', 25),
+        ('ema_period', 20),
+        ('ema_sell_period', 10)
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.high = []
+        self.low = []
+        self.ema = []
+        self.ema_sell = []
+        for i, data in enumerate(self.datas):
+            self.high.append(bt.indicators.Highest(data.high, period=self.params.highest_window))
+            self.low.append(bt.indicators.Lowest(data.low, period=self.params.lowest_window))
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema_sell.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_sell_period))
+
+    def next(self):
+        if self.order:
+            return
+
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0 :
+                if data.close[0] < self.low[i][-1] :
+                    print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
+                    self.order = self.buy(data)
+            else:
+                hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
+                if data.close[0] > self.high[i][-1] :
+                    print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
+                    self.order = self.sell(data)
+```
+
+```txt
+2024-07-23 17:36:53,757 - my_logger - INFO - buy price sum: 29627.29852567998, sell price sum: 29799.069204409996, earning ratio: 0.005797716541085599
+2024-07-23 17:36:53,757 - my_logger - INFO - Total count: 654, success count: 407, success rate: 0.6223241590214067
+2024-07-23 17:36:53,758 - my_logger - INFO - Sharp ratio: 0.09097891154979973
+Final Portfolio Value: 99275.08
+Sharpe Ratio: OrderedDict([('sharperatio', -0.6921269346939204)])
+max Draw Down: AutoOrderedDict([('len', 159), ('drawdown', 1.4656624604966713), ('moneydown', 1466.5450536732533)])
+return: -0.16699293299743187
+```
+Buy stocks that hit a 25-day low, and sell when the stock price exceeds the highest price within 15 days. Among the stocks that can be sold within 1-10 days, there are hardly any losses, but as the trigger time gets longer, the returns get lower, and they are basically losses, with high credibility. The point that needs to be further explored is how to find those stocks that can be triggered in a short time, add judgments of other indicators, and screen these out.
+
+Conversely, for stocks that hit new highs, those that end in the short term are basically losses, and as time increases, the returns become higher. Among the stocks in the hs300, the medium-term momentum effect is more obvious, and the short-term reversal effect is more pronounced.
+
+- new low
+  
+  ![new low](images/new_low25.jpg)
+- new low hist
+  
+  ![new low hist](images/new_low25_hist.jpg)
+
+- new high
+  
+  ![new high](images/new_high.jpg)
