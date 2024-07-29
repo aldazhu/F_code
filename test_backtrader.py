@@ -98,7 +98,7 @@ def demo_of_ShortTermReversalEffectinStocks():
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    data_root = "data"
+    data_root = "data_index"
     test_all_data = True
 
     data_names = [
