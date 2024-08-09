@@ -687,16 +687,44 @@ def DemoOfCluster():
         # tool.drawOneSample(X[i],Y[i],True,image_save_path)
 
 def demo_of_datapro():
-    save_root = "./data_hour"
+    save_root = "./data"
     dp = DataPro()
     dp.set_save_root(save_root)
     stock_code = "sh.000300"
-    start_date = "2022-01-01"
+    start_date = "2016-01-01"
     end_date = "2024-02-05"
-    frequency = "60"
+    frequency = "d"
     # dp.download_k_history(stock_code, start_date, end_date, frequency,mode="index")
     # dp.download_k_history(stock_code, start_date, end_date, frequency,mode="stock")
     dp.download_all_hs300_stocks(start_date, end_date, frequency)
+
+
+def demo_of_filter_data():
+    pass
+    root = "./data"
+    # filter the data, nan or 0.0
+    total_file_num = len(os.listdir(root))
+    filter_file_num = 0
+    items = ["open","high","low","close"]
+    for file_name in os.listdir(root):
+        file_path = os.path.join(root, file_name)
+        print(f"processing {file_path}")
+        data = pd.read_csv(file_path)
+        src_size = len(data)
+        # filter the 0 in data columns
+        for item in items:
+            print("filter item:",item)
+            for i in range(len(data[item])):
+                # print(abs(data[item][i] ))
+                # break
+
+                if abs(data[item][i] ) < 1e-6:
+                    print(f"filter {file_path} {item} {i}")
+                    data[item][i] = data[item][i-1]
+
+        print(f"total file num:{total_file_num}, filter file num:{filter_file_num}")
+        # break
+        
 
 
 if __name__ == "__main__":
@@ -707,4 +735,5 @@ if __name__ == "__main__":
     # demo_of_download_etf()
     # downloadHS300Demo()
     # DemoOfCluster()
-    demo_of_datapro()
+    # demo_of_datapro()
+    demo_of_filter_data()
