@@ -162,21 +162,34 @@ class StockStatus:
         self.hold_days = 0
         self.earning_ratio = 0
 
+    def get_status_in_string(self):
+        status_str = (
+            f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
+            f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
+            f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
+            f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
+        )
+        return status_str
+
+
     def print(self):
         self.hold_days = (self.sell_date - self.buy_date).days
-        print(
-            f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
-            f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
-            f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
-            f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
-            )
+        # print(
+        #     f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
+        #     f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
+        #     f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
+        #     f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
+        #     )
+
+        print(self.get_status_in_string())
+        logger.info(self.get_status_in_string())
         
-        logger.info(
-            f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
-            f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
-            f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
-            f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
-            )
+        # logger.info(
+        #     f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
+        #     f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
+        #     f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
+        #     f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
+        #     )
 
 class HoldPool:
     def __init__(self):
@@ -253,6 +266,7 @@ class StragegyTemplate(bt.Strategy):
         buy_price_sum = 0
         sell_price_sum = 0
         earning_ratio = []
+        stock_trade_dict = {} # stock_code , record_list
         for record in self.history_records:
             record.print()
             if record.earning_ratio > 0:
@@ -260,6 +274,11 @@ class StragegyTemplate(bt.Strategy):
             buy_price_sum += record.buy_price
             sell_price_sum += record.sell_price
             earning_ratio.append(record.earning_ratio)
+            if record.stock_code in stock_trade_dict.keys():
+                stock_trade_dict[record.stock_code].append(record)
+            else:
+                stock_trade_dict[record.stock_code] = [record]
+
 
         if buy_price_sum == 0:
             self.logger.info("No record in the history")
@@ -273,7 +292,14 @@ class StragegyTemplate(bt.Strategy):
 
         sharp_ratio = np.mean(earning_ratio) / np.std(earning_ratio)
         # print(f"Sharp ratio: {sharp_ratio}")
+        self.logger.info("mean: %s, std: %s", np.mean(earning_ratio), np.std(earning_ratio))
         self.logger.info("Sharp ratio: %s", sharp_ratio)
+
+        for stock_code, record_list in stock_trade_dict.items():
+            self.logger.info("==============================\n stock code : %s", stock_code)
+            for record in record_list:
+                self.logger.info("record, %s",record.get_status_in_string())
+                # print(record)
 
         # plot holding days and earning ratio
         holding_days = [record.hold_days for record in self.history_records]
@@ -864,16 +890,19 @@ class ShortTermReversalEffectinStocks(StragegyTemplate):
 # have performed well in the past will continue to perform well in the future, and vice versa.
 class PriceMomumentStrategy(StragegyTemplate):
     params = (
-        ('period', 5),
-        ('top_k', 10),
+        ('period', 10),
+        ('ema_period', 30),
+        ('top_k', 30),
     )
     def __init__(self):
         super().__init__()
         self.momentum = [] # momentum in percentage
+        self.ema = []
         # self.hold_pool = HoldPool()
         for i, data in enumerate(self.datas):
             # print(f"{data._name}")
             self.momentum.append(bt.indicators.Momentum(data.close, period=self.params.period) / data.close[-self.params.period] * 100)
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
             # print(f"{data._name} done")
 
     def next(self):
@@ -895,10 +924,10 @@ class PriceMomumentStrategy(StragegyTemplate):
             last_price = self.datas[stock[0]].close[-self.params.period]
             cal_momentum = (now_price - last_price) / last_price * 100
             print(f"now price: {now_price}, last price: {last_price}, calculated momentum: {cal_momentum}")
-            print(f"next close price: {self.datas[stock[0]].close[1]}, next open price: {self.datas[stock[0]].open[1]}")
-            print(f"yesterday price: {self.datas[stock[0]].close[-1]}")
+            # print(f"next close price: {self.datas[stock[0]].close[1]}, next open price: {self.datas[stock[0]].open[1]}")
+            # print(f"yesterday price: {self.datas[stock[0]].close[-1]}")
             stock_code = self.datas[stock[0]]._name
-            if self.hold_pool.get_record(stock_code) is None:
+            if self.hold_pool.get_record(stock_code) is None and self.datas[stock[0]].close > self.ema[stock[0]][0]:
                 self.buy(self.datas[stock[0]])
         # sell the stocks that are not in the top k
         for i, data in enumerate(self.datas):
