@@ -664,22 +664,22 @@ class NewHighStrategy(StragegyTemplate):
 
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0 :
-                if data.close[0] > self.high[i][-1] and data.close[0] > self.ema[i][0]:
+                if data.close[0] > self.high[i][-1] :
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
             else:
-                if data.close[0] < self.low[i][-1] or data.close[0] < self.ema_sell[i][0] :
+                if data.close[0] < self.low[i][-1]  :
                     print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
                     self.order = self.sell(data)
         # stop loss
-        self.stop_loss_watch_dog()
-        self.stop_eaning_watch_dog()
+        # self.stop_loss_watch_dog()
+        # self.stop_eaning_watch_dog()
 
 class NewLowStrategy(StragegyTemplate):
     params = (
         ('highest_window', 15),
         ('lowest_window', 25),
-        ('ema_period', 20),
+        ('ema_period', 5),
         ('ema_sell_period', 10)
     )
 
@@ -701,7 +701,7 @@ class NewLowStrategy(StragegyTemplate):
 
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0 :
-                if data.close[0] < self.low[i][-1] :
+                if self.low[i][0] < self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
             else:
