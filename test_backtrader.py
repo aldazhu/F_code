@@ -154,6 +154,7 @@ def demo_of_simple_strategy():
         # BollingerBandsStrategy, # ok
         # RSRSStrategy, # ok
         PriceMomumentStrategy,
+        # InvertPriceMomumentStrategy,
     ]
 
     test_backtrader(datas, strategies=strategies, cash=100000.0, commission=0.001, stake=stake)

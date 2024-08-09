@@ -864,7 +864,7 @@ class ShortTermReversalEffectinStocks(StragegyTemplate):
 # have performed well in the past will continue to perform well in the future, and vice versa.
 class PriceMomumentStrategy(StragegyTemplate):
     params = (
-        ('period', 30),
+        ('period', 5),
         ('top_k', 10),
     )
     def __init__(self):
@@ -895,6 +895,8 @@ class PriceMomumentStrategy(StragegyTemplate):
             last_price = self.datas[stock[0]].close[-self.params.period]
             cal_momentum = (now_price - last_price) / last_price * 100
             print(f"now price: {now_price}, last price: {last_price}, calculated momentum: {cal_momentum}")
+            print(f"next close price: {self.datas[stock[0]].close[1]}, next open price: {self.datas[stock[0]].open[1]}")
+            print(f"yesterday price: {self.datas[stock[0]].close[-1]}")
             stock_code = self.datas[stock[0]]._name
             if self.hold_pool.get_record(stock_code) is None:
                 self.buy(self.datas[stock[0]])
@@ -905,6 +907,50 @@ class PriceMomumentStrategy(StragegyTemplate):
                 if self.hold_pool.get_record(stock_code) is not None:
                     
                     self.sell(data)
+        
+        # input("Press Enter to continue...")
 
         
+class InvertPriceMomumentStrategy(StragegyTemplate):
+    params = (
+        ('period', 5),
+        ('top_k', 10),
+    )
+    def __init__(self):
+        super().__init__()
+        self.momentum = [] # momentum in percentage
+        # self.hold_pool = HoldPool()
+        for i, data in enumerate(self.datas):
+            # print(f"{data._name}")
+            self.momentum.append(bt.indicators.Momentum(data.close, period=self.params.period) / data.close[-self.params.period] * 100)
+            # print(f"{data._name} done")
+
+    def next(self):
+        pass
         
+        #  calculate the momentum of each stock
+        moment_list = [] # item is (i, momentum)
+        for i, data in enumerate(self.datas):
+            moment_list.append((i, self.momentum[i][0]))
+        
+        # sort the momentum list by momentum
+        moment_list = sorted(moment_list, key=lambda x: x[1], reverse=False)
+        # select the top k stocks with the highest momentum
+        top_k_stocks = moment_list[:self.params.top_k]
+        # buy the top k stocks
+        for stock in top_k_stocks:
+            print(f"top k {self.datas[stock[0]]._name}, momentum: {stock[1]}")
+            now_price = self.datas[stock[0]].close[0]
+            last_price = self.datas[stock[0]].close[-self.params.period]
+            cal_momentum = (now_price - last_price) / last_price * 100
+            print(f"now price: {now_price}, last price: {last_price}, calculated momentum: {cal_momentum}")
+            stock_code = self.datas[stock[0]]._name
+            if self.hold_pool.get_record(stock_code) is None:
+                self.buy(self.datas[stock[0]])
+        # sell the stocks that are not in the top k
+        for i, data in enumerate(self.datas):
+            if (i, self.momentum[i][0]) not in top_k_stocks:
+                stock_code = self.datas[i]._name
+                if self.hold_pool.get_record(stock_code) is not None:
+                    
+                    self.sell(data)
