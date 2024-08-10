@@ -39,6 +39,24 @@ class MyMinutelyData(btfeeds.GenericCSVData):
         ('openinterest', -1)
     )
 
+class MySeaData(btfeeds.GenericCSVData):
+    params = (
+        ('fromdate', datetime.datetime(2022, 11, 1)),
+        ('todate', datetime.datetime(2023, 12, 31)),
+        ('dtformat', ('%Y-%m-%d')),
+        # ('tmformat', ('%H.%M.%S')),
+        ('datetime', 0),
+        # ('time', -1),
+        ('open', 1),
+        ('high', 2),
+        ('low', 3),
+        ('close', 4),
+        ('volume', 7),
+        # ('openinterest', -1)
+    )
+
+
+
 
 # https://www.backtrader.com/docu/quickstart/quickstart/#customizing-the-strategy-parameters
 class QuickGuideStrategy(bt.Strategy):
@@ -144,21 +162,34 @@ class StockStatus:
         self.hold_days = 0
         self.earning_ratio = 0
 
+    def get_status_in_string(self):
+        status_str = (
+            f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
+            f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
+            f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
+            f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
+        )
+        return status_str
+
+
     def print(self):
         self.hold_days = (self.sell_date - self.buy_date).days
-        print(
-            f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
-            f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
-            f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
-            f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
-            )
+        # print(
+        #     f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
+        #     f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
+        #     f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
+        #     f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
+        #     )
+
+        print(self.get_status_in_string())
+        logger.info(self.get_status_in_string())
         
-        logger.info(
-            f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
-            f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
-            f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
-            f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
-            )
+        # logger.info(
+        #     f"Stock code: {self.stock_code}, Strategy: {self.strategy_name}, Status: {self.status},"
+        #     f"Buy date: {self.buy_date}, Buy price: {self.buy_price}, "
+        #     f"Sell date: {self.sell_date},Sell price: {self.sell_price}, "
+        #     f"Hold days: {self.hold_days}, Earning ratio: {self.earning_ratio}"
+        #     )
 
 class HoldPool:
     def __init__(self):
@@ -235,6 +266,7 @@ class StragegyTemplate(bt.Strategy):
         buy_price_sum = 0
         sell_price_sum = 0
         earning_ratio = []
+        stock_trade_dict = {} # stock_code , record_list
         for record in self.history_records:
             record.print()
             if record.earning_ratio > 0:
@@ -242,6 +274,15 @@ class StragegyTemplate(bt.Strategy):
             buy_price_sum += record.buy_price
             sell_price_sum += record.sell_price
             earning_ratio.append(record.earning_ratio)
+            if record.stock_code in stock_trade_dict.keys():
+                stock_trade_dict[record.stock_code].append(record)
+            else:
+                stock_trade_dict[record.stock_code] = [record]
+
+
+        if buy_price_sum == 0:
+            self.logger.info("No record in the history")
+            return
 
         if total_count == 0:
             print("No record to analyze")
@@ -254,7 +295,14 @@ class StragegyTemplate(bt.Strategy):
 
         sharp_ratio = np.mean(earning_ratio) / np.std(earning_ratio)
         # print(f"Sharp ratio: {sharp_ratio}")
+        self.logger.info("mean: %s, std: %s", np.mean(earning_ratio), np.std(earning_ratio))
         self.logger.info("Sharp ratio: %s", sharp_ratio)
+
+        for stock_code, record_list in stock_trade_dict.items():
+            self.logger.info("==============================\n stock code : %s", stock_code)
+            for record in record_list:
+                self.logger.info("record, %s",record.get_status_in_string())
+                # print(record)
 
         # plot holding days and earning ratio
         holding_days = [record.hold_days for record in self.history_records]
@@ -403,9 +451,13 @@ class CCIStrategy(StragegyTemplate):
         self.cci = []
         self.highest = []
         for i, data in enumerate(self.datas):
+            print(f"data name: {data._name}, num: {i}")
             self.cci.append(bt.indicators.CCI(data, period=self.params.cci_period))
             self.highest.append(bt.indicators.Highest(data.high, period=self.params.high_period))
+            print(f"done with {data._name}")
 
+        
+        
     def next(self):
         
         # check if there is an unfinished order
@@ -413,12 +465,14 @@ class CCIStrategy(StragegyTemplate):
             return
 
         for i, data in enumerate(self.datas):
+            print(f"data name: {data._name}, num: {i}")
             if self.getposition(data).size > 0:
                 if self.cci[i][0] < self.params.cci_upper and self.cci[i][-1] >= self.params.cci_upper:
                     self.order = self.sell(data)
             else:
                 if self.cci[i][0] > self.params.cci_lower and self.cci[i][-1] <= self.params.cci_lower:
                     self.order = self.buy(data)
+            print(f"done with {data._name}")
         
                 
 
@@ -617,7 +671,7 @@ class NewHighStrategy(StragegyTemplate):
     params = (
         ('highest_window', 20),
         ('lowest_window', 10),
-        ('ema_period', 120),
+        ('ema_period', 20),
         ('ema_sell_period', 10)
     )
 
@@ -645,18 +699,18 @@ class NewHighStrategy(StragegyTemplate):
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
             else:
-                if data.close[0] < self.low[i][-1] or data.close[0] < self.ema_sell[i][0] :
+                if data.close[0] < self.low[i][-1]  :
                     print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
                     self.order = self.sell(data)
         # stop loss
-        self.stop_loss_watch_dog()
-        self.stop_eaning_watch_dog()
+        # self.stop_loss_watch_dog()
+        # self.stop_eaning_watch_dog()
 
 class NewLowStrategy(StragegyTemplate):
     params = (
         ('highest_window', 15),
         ('lowest_window', 25),
-        ('ema_period', 20),
+        ('ema_period', 5),
         ('ema_sell_period', 10)
     )
 
@@ -678,11 +732,12 @@ class NewLowStrategy(StragegyTemplate):
 
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0 :
+                if self.low[i][0] < self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
                 if data.close[0] > self.high[i][-1] and data.close[0] > self.ema[i][0]:
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
             else:
-                hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
+                # hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
                 if data.close[0] > self.high[i][-1] :
                     print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
                     self.order = self.sell(data)
@@ -834,6 +889,103 @@ class ShortTermReversalEffectinStocks(StragegyTemplate):
             self.buy(stock)
         for stock in short_stocks:
             self.sell(stock)
-            
+
+
+# The idea behind this strategy is that once a trend is established, it is more likely to continue 
+# in that direction than to move against the trend. This is based on the assumption that assets that 
+# have performed well in the past will continue to perform well in the future, and vice versa.
+class PriceMomumentStrategy(StragegyTemplate):
+    params = (
+        ('period', 10),
+        ('ema_period', 30),
+        ('top_k', 30),
+    )
+    def __init__(self):
+        super().__init__()
+        self.momentum = [] # momentum in percentage
+        self.ema = []
+        # self.hold_pool = HoldPool()
+        for i, data in enumerate(self.datas):
+            # print(f"{data._name}")
+            self.momentum.append(bt.indicators.Momentum(data.close, period=self.params.period) / data.close[-self.params.period] * 100)
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            # print(f"{data._name} done")
+
+    def next(self):
+        pass
         
+        #  calculate the momentum of each stock
+        moment_list = [] # item is (i, momentum)
+        for i, data in enumerate(self.datas):
+            moment_list.append((i, self.momentum[i][0]))
         
+        # sort the momentum list by momentum
+        moment_list = sorted(moment_list, key=lambda x: x[1], reverse=True)
+        # select the top k stocks with the highest momentum
+        top_k_stocks = moment_list[:self.params.top_k]
+        # buy the top k stocks
+        for stock in top_k_stocks:
+            print(f"top k {self.datas[stock[0]]._name}, momentum: {stock[1]}")
+            now_price = self.datas[stock[0]].close[0]
+            last_price = self.datas[stock[0]].close[-self.params.period]
+            cal_momentum = (now_price - last_price) / last_price * 100
+            print(f"now price: {now_price}, last price: {last_price}, calculated momentum: {cal_momentum}")
+            # print(f"next close price: {self.datas[stock[0]].close[1]}, next open price: {self.datas[stock[0]].open[1]}")
+            # print(f"yesterday price: {self.datas[stock[0]].close[-1]}")
+            stock_code = self.datas[stock[0]]._name
+            if self.hold_pool.get_record(stock_code) is None and self.datas[stock[0]].close > self.ema[stock[0]][0]:
+                self.buy(self.datas[stock[0]])
+        # sell the stocks that are not in the top k
+        for i, data in enumerate(self.datas):
+            if (i, self.momentum[i][0]) not in top_k_stocks:
+                stock_code = self.datas[i]._name
+                if self.hold_pool.get_record(stock_code) is not None:
+                    
+                    self.sell(data)
+        
+        # input("Press Enter to continue...")
+
+        
+class InvertPriceMomumentStrategy(StragegyTemplate):
+    params = (
+        ('period', 5),
+        ('top_k', 10),
+    )
+    def __init__(self):
+        super().__init__()
+        self.momentum = [] # momentum in percentage
+        # self.hold_pool = HoldPool()
+        for i, data in enumerate(self.datas):
+            # print(f"{data._name}")
+            self.momentum.append(bt.indicators.Momentum(data.close, period=self.params.period) / data.close[-self.params.period] * 100)
+            # print(f"{data._name} done")
+
+    def next(self):
+        pass
+        
+        #  calculate the momentum of each stock
+        moment_list = [] # item is (i, momentum)
+        for i, data in enumerate(self.datas):
+            moment_list.append((i, self.momentum[i][0]))
+        
+        # sort the momentum list by momentum
+        moment_list = sorted(moment_list, key=lambda x: x[1], reverse=False)
+        # select the top k stocks with the highest momentum
+        top_k_stocks = moment_list[:self.params.top_k]
+        # buy the top k stocks
+        for stock in top_k_stocks:
+            print(f"top k {self.datas[stock[0]]._name}, momentum: {stock[1]}")
+            now_price = self.datas[stock[0]].close[0]
+            last_price = self.datas[stock[0]].close[-self.params.period]
+            cal_momentum = (now_price - last_price) / last_price * 100
+            print(f"now price: {now_price}, last price: {last_price}, calculated momentum: {cal_momentum}")
+            stock_code = self.datas[stock[0]]._name
+            if self.hold_pool.get_record(stock_code) is None:
+                self.buy(self.datas[stock[0]])
+        # sell the stocks that are not in the top k
+        for i, data in enumerate(self.datas):
+            if (i, self.momentum[i][0]) not in top_k_stocks:
+                stock_code = self.datas[i]._name
+                if self.hold_pool.get_record(stock_code) is not None:
+                    
+                    self.sell(data)

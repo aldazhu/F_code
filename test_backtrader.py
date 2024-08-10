@@ -76,6 +76,16 @@ def get_minutely_data(data_name, from_date, to_date):
                 todate=to_date)
     return data
 
+def get_sea_data(data_name, from_date, to_date):
+    if not os.path.exists(data_name):
+        print(f"Data file {data_name} does not exist.")
+        raise "Data file does not exist."
+
+    data = MySeaData(dataname=data_name,
+                fromdate=from_date,
+                todate=to_date)
+    return data
+
 
 def demo_of_ShortTermReversalEffectinStocks():
     data_root = 'data'
@@ -104,34 +114,36 @@ def demo_of_simple_strategy():
     data_names = [
         f'{data_root}/sz.300628.csv',
         f'{data_root}/sz.300979.csv',
-        f'{data_root}/sh.600000.csv',
-        f'{data_root}/sh.600089.csv',
-        f'{data_root}/sh.601059.csv',
-        f'{data_root}/sh.603296.csv',
-        f'{data_root}/sh.603501.csv',
-        f'{data_root}/sz.000733.csv',
-        f'{data_root}/sz.001289.csv',
-        f'{data_root}/sz.002230.csv',
-        f'{data_root}/sz.002714.csv'
+        # f'{data_root}/sh.600000.csv',
+        # f'{data_root}/sh.600089.csv',
+        # f'{data_root}/sh.601059.csv',
+        # f'{data_root}/sh.603296.csv',
+        # f'{data_root}/sh.603501.csv',
+        # f'{data_root}/sz.000733.csv',
+        # f'{data_root}/sz.001289.csv',
+        # f'{data_root}/sz.002230.csv',
+        # f'{data_root}/sz.002714.csv',
     ]
 
     if test_all_data:
         data_names = [os.path.join(data_root, item) for item in os.listdir(data_root)]
 
     # data_name = 'data_index/sh.000300.csv'
-    from_date = datetime.datetime(2016, 1, 1)
-    to_date = datetime.datetime(2024, 12, 31)
+    from_date = datetime.datetime(2018, 5, 1)
+    to_date = datetime.datetime(2024, 1, 30)
     # data = get_data(data_name, from_date, to_date)
     
     if "hour" in data_names[0]:
         datas = [get_minutely_data(data_name, from_date, to_date) for data_name in data_names]
+    elif "sea" in data_names[0]:
+        datas = [get_sea_data(data_name, from_date, to_date) for data_name in data_names]
     else:
         datas = [get_data(data_name, from_date, to_date) for data_name in data_names]
 
     stake = 1
 
     strategies = [
-        NewHighStrategy ,# ok
+        # NewHighStrategy ,# ok
         # NewLowStrategy, # ok
         # MovingAverageStrategy, # ok
         # CombinedIndicatorStrategy, # ok
@@ -140,7 +152,9 @@ def demo_of_simple_strategy():
         # DoubleEmaStrategy, # ok
         # MACDTrendFollowingStrategy, # ok
         # BollingerBandsStrategy, # ok
-        # RSRSStrategy # ok
+        # RSRSStrategy, # ok
+        PriceMomumentStrategy,
+        # InvertPriceMomumentStrategy,
     ]
 
     test_backtrader(datas, strategies=strategies, cash=100000.0, commission=0.001, stake=stake)
