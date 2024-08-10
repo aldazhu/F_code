@@ -4,7 +4,7 @@ import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 
-from backtrader_indicator import RSRS, RSRS_Norm
+from backtrader_indicator import RSRS, RSRS_Norm, Diff
 from my_logger import logger
 
 class MyData(btfeeds.GenericCSVData):
@@ -988,3 +988,31 @@ class InvertPriceMomumentStrategy(StragegyTemplate):
                 if self.hold_pool.get_record(stock_code) is not None:
                     
                     self.sell(data)
+
+
+class EMATrendStrategy(StragegyTemplate):
+    params = (
+        ('ema_period', 30),
+        ('ema_period2', 10),
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.ema = []
+        self.ema2 = []
+        for i, data in enumerate(self.datas):
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema2.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period2))
+
+
+    def next(self):
+        if self.order:
+            return
+
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0:
+                if self.ema[i][0] > self.ema[i][-1] :
+                    self.order = self.buy(data)
+            else:
+                if self.ema[i][0] < self.ema[i][-1] :
+                    self.order = self.sell(data)
