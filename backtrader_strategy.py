@@ -733,7 +733,6 @@ class NewLowStrategy(StragegyTemplate):
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0 :
                 if self.low[i][0] < self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
-                if data.close[0] > self.high[i][-1] and data.close[0] > self.ema[i][0]:
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
             else:
