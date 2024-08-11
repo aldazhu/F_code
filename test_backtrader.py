@@ -148,14 +148,14 @@ def demo_of_simple_strategy():
         # MovingAverageStrategy, # ok
         # CombinedIndicatorStrategy, # ok
         # RSIStrategy, # ok
-        CCIStrategy,  # ok
+        # CCIStrategy,  # ok
         # DoubleEmaStrategy, # ok
         # MACDTrendFollowingStrategy, # ok
         # BollingerBandsStrategy, # ok
         # RSRSStrategy, # ok
         # PriceMomumentStrategy,
         # InvertPriceMomumentStrategy,
-        # EMATrendStrategy, 
+        EMATrendStrategy, 
     ]
 
     test_backtrader(datas, strategies=strategies, cash=1000000.0, commission=0.001, stake=stake)

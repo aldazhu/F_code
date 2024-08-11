@@ -118,6 +118,48 @@ class DataPro():
                 f.write(stock_code + " " + stock_name + "\n")
                 
                 self.download_k_history(stock_code, start_date, end_date, frequency)
+
+    def get_market(self, stock_code):
+        """Determine which market the stock belongs to"""
+        if stock_code.startswith('60'):
+            return 'Shanghai'
+        elif stock_code.startswith('00') or stock_code.startswith('30'):
+            return 'Shenzhen'
+        elif stock_code.startswith('68'):
+            # Shanghai Stock Exchange Science and Technology Innovation Board
+            return 'STAR'
+        else:
+            return 'Unknown Market'
+
+    def download_all_zh1000_stocks(self, start_date, end_date, frequency="d",zh1000_names_path="doc/names_zh1000.txt"):
+        """read doc/names_zh1000.txt and download the stocks
+
+        Args:
+            start_date (_type_): _description_
+            end_date (_type_): _description_
+            frequency (str, optional): _description_. Defaults to "d".
+            zh1000_names_path ()
+
+        Returns:
+            _type_: _description_
+        """
+        with open(zh1000_names_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        total_lines = len(lines)
+        current_num = 0
+        skip_num = 0
+        for line in lines:
+            stock_code , stock_name = line.strip().split(' ')
+            current_num += 1
+            print(f"{current_num}/{total_lines} skipnum:{skip_num} \t {stock_code} {stock_name}")
+            market = self.get_market(stock_code)
+            if market == "STAR":
+                print(" skip STAR code")
+                skip_num += 1
+                continue
+            self.download_k_history(stock_code, start_date, end_date, frequency)
+
             
 
 # download data from Internet
@@ -687,16 +729,17 @@ def DemoOfCluster():
         # tool.drawOneSample(X[i],Y[i],True,image_save_path)
 
 def demo_of_datapro():
-    save_root = "./data"
+    save_root = "./data_zh1000"
     dp = DataPro()
     dp.set_save_root(save_root)
     stock_code = "sh.000300"
-    start_date = "2016-01-01"
-    end_date = "2024-02-05"
+    start_date = "2024-01-01"
+    end_date = "2024-03-05"
     frequency = "d"
     # dp.download_k_history(stock_code, start_date, end_date, frequency,mode="index")
     # dp.download_k_history(stock_code, start_date, end_date, frequency,mode="stock")
-    dp.download_all_hs300_stocks(start_date, end_date, frequency)
+    # dp.download_all_hs300_stocks(start_date, end_date, frequency)
+    dp.download_all_zh1000_stocks(start_date,end_date, frequency)
 
 
 def demo_of_filter_data():
@@ -736,4 +779,5 @@ if __name__ == "__main__":
     # downloadHS300Demo()
     # DemoOfCluster()
     # demo_of_datapro()
-    demo_of_filter_data()
+    # demo_of_filter_data()
+    demo_of_datapro()

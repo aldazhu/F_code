@@ -1002,7 +1002,7 @@ class EMATrendStrategy(StragegyTemplate):
         self.ema2 = []
         for i, data in enumerate(self.datas):
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
-            self.ema2.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period2))
+            # self.ema2.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period2))
 
 
     def next(self):
