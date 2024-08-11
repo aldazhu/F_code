@@ -108,7 +108,7 @@ def demo_of_ShortTermReversalEffectinStocks():
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    data_root = "data"
+    data_root = "data_zh1000"
     test_all_data = True
 
     data_names = [
@@ -153,9 +153,9 @@ def demo_of_simple_strategy():
         # MACDTrendFollowingStrategy, # ok
         # BollingerBandsStrategy, # ok
         # RSRSStrategy, # ok
-        # PriceMomumentStrategy,
+        PriceMomumentStrategy,
         # InvertPriceMomumentStrategy,
-        EMATrendStrategy, 
+        # EMATrendStrategy, 
     ]
 
     test_backtrader(datas, strategies=strategies, cash=1000000.0, commission=0.001, stake=stake)
