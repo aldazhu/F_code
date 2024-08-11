@@ -129,8 +129,8 @@ def demo_of_simple_strategy():
         data_names = [os.path.join(data_root, item) for item in os.listdir(data_root)]
 
     # data_name = 'data_index/sh.000300.csv'
-    from_date = datetime.datetime(2018, 5, 1)
-    to_date = datetime.datetime(2024, 1, 30)
+    from_date = datetime.datetime(2020, 1, 1)
+    to_date = datetime.datetime(2024, 3, 30)
     # data = get_data(data_name, from_date, to_date)
     
     if "hour" in data_names[0]:
@@ -157,6 +157,9 @@ def demo_of_simple_strategy():
         # InvertPriceMomumentStrategy,
         # EMATrendStrategy, 
     ]
+
+    for data in datas:
+        print(f"Data length for {data}: {len(data)}")
 
     test_backtrader(datas, strategies=strategies, cash=1000000.0, commission=0.001, stake=stake)
 

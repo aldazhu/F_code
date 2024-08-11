@@ -733,7 +733,7 @@ def demo_of_datapro():
     dp = DataPro()
     dp.set_save_root(save_root)
     stock_code = "sh.000300"
-    start_date = "2024-01-01"
+    start_date = "2016-01-01"
     end_date = "2024-03-05"
     frequency = "d"
     # dp.download_k_history(stock_code, start_date, end_date, frequency,mode="index")
@@ -768,6 +768,23 @@ def demo_of_filter_data():
         print(f"total file num:{total_file_num}, filter file num:{filter_file_num}")
         # break
         
+def demo_of_write_zh1000_to_txt():
+        
+    # 读取CSV文件
+    df = pd.read_csv('zh_1000.CSV', encoding='gbk')
+
+    # 提取股票代码和股票名称
+    stock_codes = df['股票代码']
+    stock_names = df['股票简称']
+
+    # 打印结果
+    # print(stock_codes)
+    # print(stock_names)
+
+    with open('doc/names_zh1000.txt', 'w', encoding='utf-8') as f:
+        for stock_code , stock_name in zip(stock_codes, stock_names):
+            f.write(f"{stock_code} {stock_name} \n" )
+
 
 
 if __name__ == "__main__":
@@ -781,3 +798,4 @@ if __name__ == "__main__":
     # demo_of_datapro()
     # demo_of_filter_data()
     demo_of_datapro()
+    # demo_of_write_zh1000_to_txt()

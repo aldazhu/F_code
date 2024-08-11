@@ -897,7 +897,7 @@ class PriceMomumentStrategy(StragegyTemplate):
     params = (
         ('period', 10),
         ('ema_period', 30),
-        ('top_k', 30),
+        ('top_k', 10),
     )
     def __init__(self):
         super().__init__()
