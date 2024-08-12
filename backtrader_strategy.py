@@ -279,6 +279,11 @@ class StragegyTemplate(bt.Strategy):
             else:
                 stock_trade_dict[record.stock_code] = [record]
 
+        for stock_code, record_list in stock_trade_dict.items():
+            self.logger.info("==============================\n stock code : %s", stock_code)
+            for record in record_list:
+                self.logger.info("record, %s",record.get_status_in_string())
+                # print(record)
 
         if buy_price_sum == 0:
             self.logger.info("No record in the history")
@@ -295,14 +300,9 @@ class StragegyTemplate(bt.Strategy):
 
         sharp_ratio = np.mean(earning_ratio) / np.std(earning_ratio)
         # print(f"Sharp ratio: {sharp_ratio}")
+        
         self.logger.info("mean: %s, std: %s", np.mean(earning_ratio), np.std(earning_ratio))
         self.logger.info("Sharp ratio: %s", sharp_ratio)
-
-        for stock_code, record_list in stock_trade_dict.items():
-            self.logger.info("==============================\n stock code : %s", stock_code)
-            for record in record_list:
-                self.logger.info("record, %s",record.get_status_in_string())
-                # print(record)
 
         # plot holding days and earning ratio
         holding_days = [record.hold_days for record in self.history_records]
@@ -895,9 +895,9 @@ class ShortTermReversalEffectinStocks(StragegyTemplate):
 # have performed well in the past will continue to perform well in the future, and vice versa.
 class PriceMomumentStrategy(StragegyTemplate):
     params = (
-        ('period', 10),
+        ('period', 20),
         ('ema_period', 30),
-        ('top_k', 10),
+        ('top_k', 5),
     )
     def __init__(self):
         super().__init__()
@@ -905,10 +905,10 @@ class PriceMomumentStrategy(StragegyTemplate):
         self.ema = []
         # self.hold_pool = HoldPool()
         for i, data in enumerate(self.datas):
-            # print(f"{data._name}")
+            print(f"{i}  {data._name}")
             self.momentum.append(bt.indicators.Momentum(data.close, period=self.params.period) / data.close[-self.params.period] * 100)
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
-            # print(f"{data._name} done")
+            print(f"{data._name} done")
 
     def next(self):
         pass
@@ -932,7 +932,7 @@ class PriceMomumentStrategy(StragegyTemplate):
             # print(f"next close price: {self.datas[stock[0]].close[1]}, next open price: {self.datas[stock[0]].open[1]}")
             # print(f"yesterday price: {self.datas[stock[0]].close[-1]}")
             stock_code = self.datas[stock[0]]._name
-            if self.hold_pool.get_record(stock_code) is None and self.datas[stock[0]].close > self.ema[stock[0]][0]:
+            if self.hold_pool.get_record(stock_code) is None :
                 self.buy(self.datas[stock[0]])
         # sell the stocks that are not in the top k
         for i, data in enumerate(self.datas):

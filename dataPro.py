@@ -742,7 +742,7 @@ def demo_of_datapro():
     dp.download_all_zh1000_stocks(start_date,end_date, frequency)
 
 
-def demo_of_filter_data():
+def demo_of_filter_zero_data():
     pass
     root = "./data"
     # filter the data, nan or 0.0
@@ -786,6 +786,23 @@ def demo_of_write_zh1000_to_txt():
             f.write(f"{stock_code} {stock_name} \n" )
 
 
+def demo_of_analysis_data():
+    pass
+    root = "./data_zh1000"
+    item_num_set = set()
+    filter_num = 0 
+    for file_name in os.listdir(root):
+        file_path = os.path.join(root, file_name)
+        print(f"processing {file_path}")
+        data = pd.read_csv(file_path)
+        item_num_set.add(len(data['open']))
+        if len(data['open']) < 700:
+            filter_num += 1
+            print(f"{filter_num} less than 1000 {file_path}")
+            print(data)
+    print(item_num_set)
+    print(f"total file num:{len(item_num_set)}, min:{min(item_num_set)}, max:{max(item_num_set)}")
+
 
 if __name__ == "__main__":
     pass
@@ -796,6 +813,7 @@ if __name__ == "__main__":
     # downloadHS300Demo()
     # DemoOfCluster()
     # demo_of_datapro()
-    # demo_of_filter_data()
-    demo_of_datapro()
+    # demo_of_filter_zero_data()
+    # demo_of_datapro()
     # demo_of_write_zh1000_to_txt()
+    demo_of_analysis_data()

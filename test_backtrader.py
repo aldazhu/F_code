@@ -1,10 +1,27 @@
 import backtrader as bt
 import datetime
 import random
+import pandas as pd
 
 import os
 
 from backtrader_strategy import *
+
+
+def get_valid_files(data_root, start_date, end_date):
+    """
+    get the valid files in the data_root, which is between start_date and end_date
+    """
+    valid_files = []
+    for item in os.listdir(data_root):
+        file = os.path.join(data_root, item)
+        df = pd.read_csv(file)
+        df['date'] = pd.to_datetime(df['date'])
+        print(f"Processing {file}, min date: {df['date'].min()}, max date: {df['date'].max()}")
+        if df['date'].min() <= start_date :
+            valid_files.append(file)
+    print(f"Total valid files: {len(valid_files)}")
+    return valid_files
 
 def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100):
     # Create a cerebro entity
@@ -51,7 +68,7 @@ def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100
     profit = cerebro.broker.getvalue() - cash
 
     # Visulize the result
-    cerebro.plot()
+    # cerebro.plot()
 
     return profit
 
@@ -110,6 +127,8 @@ def demo_of_simple_strategy():
     # Create a Data Feed
     data_root = "data_zh1000"
     test_all_data = True
+    from_date = datetime.datetime(2020, 1, 1)
+    to_date = datetime.datetime(2024, 3, 30)
 
     data_names = [
         f'{data_root}/sz.300628.csv',
@@ -126,12 +145,15 @@ def demo_of_simple_strategy():
     ]
 
     if test_all_data:
-        data_names = [os.path.join(data_root, item) for item in os.listdir(data_root)]
+        data_names = get_valid_files(data_root, from_date, to_date)
+        # data_names = [os.path.join(data_root, item) for item in os.listdir(data_root)]
 
     # data_name = 'data_index/sh.000300.csv'
-    from_date = datetime.datetime(2020, 1, 1)
-    to_date = datetime.datetime(2024, 3, 30)
+    
     # data = get_data(data_name, from_date, to_date)
+    if len(data_names) == 0:
+        print("No valid data files.")
+        return
     
     if "hour" in data_names[0]:
         datas = [get_minutely_data(data_name, from_date, to_date) for data_name in data_names]
@@ -158,16 +180,13 @@ def demo_of_simple_strategy():
         # EMATrendStrategy, 
     ]
 
-    for data in datas:
-        print(f"Data length for {data}: {len(data)}")
-
     test_backtrader(datas, strategies=strategies, cash=1000000.0, commission=0.001, stake=stake)
 
 
 def demo_of_multiple_data():
     data_root = 'data'
     stake = 100
-    from_date = datetime.datetime(2020, 1, 1)
+    from_date = datetime.datetime(2022, 1, 1)
     to_date = datetime.datetime(2024, 12, 31)
 
     total_gain = 0.0
