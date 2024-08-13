@@ -425,7 +425,7 @@ class RSIStrategy(StragegyTemplate):
         self.highest = []
         for i, data in enumerate(self.datas):
             self.min_price.append(bt.indicators.Lowest(data.low, period=self.params.high_period))
-            self.rsi.append(bt.indicators.RSI(data.close, period=self.params.rsi_period))
+            self.rsi.append(bt.indicators.RSI_Safe(data.close, period=self.params.rsi_period))
             self.highest.append(bt.indicators.Highest(data.high, period=self.params.high_period))
 
     def next(self):
@@ -669,9 +669,9 @@ class DoubleEmaStrategy(StragegyTemplate):
 
 class NewHighStrategy(StragegyTemplate):
     params = (
-        ('highest_window', 20),
-        ('lowest_window', 10),
-        ('ema_period', 20),
+        ('highest_window', 30),
+        ('lowest_window', 15),
+        ('ema_period', 10),
         ('ema_sell_period', 10)
     )
 
@@ -682,12 +682,14 @@ class NewHighStrategy(StragegyTemplate):
         self.ema = []
         self.ema_sell = []
         self.diff = [] # high - low
+        self.rsi = []
         for i, data in enumerate(self.datas):
             self.high.append(bt.indicators.Highest(data.high, period=self.params.highest_window))
             self.low.append(bt.indicators.Lowest(data.low, period=self.params.lowest_window))
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
             self.ema_sell.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_sell_period))
             self.diff.append(Diff(data,ema_period=self.params.ema_period))
+            self.rsi.append(bt.indicators.RSI_Safe(data.close, period=14))
 
     def next(self):
         if self.order:
@@ -696,11 +698,11 @@ class NewHighStrategy(StragegyTemplate):
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0 :
                 if data.close[0] > self.high[i][-1] and self.diff[i][0] > 0 and data.close[0] > self.ema[i][0]:
-                    print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
+                    # print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
             else:
-                if data.close[0] < self.low[i][-1]  :
-                    print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
+                if data.close[0] < self.ema[i][0]  or (self.rsi[i][-1] > 70 and self.rsi[i][0] < 70):
+                    # print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
                     self.order = self.sell(data)
         # stop loss
         # self.stop_loss_watch_dog()
@@ -947,7 +949,7 @@ class PriceMomumentStrategy(StragegyTemplate):
         
 class InvertPriceMomumentStrategy(StragegyTemplate):
     params = (
-        ('period', 5),
+        ('period', 30),
         ('top_k', 10),
     )
     def __init__(self):
