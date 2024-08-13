@@ -174,3 +174,19 @@ Conversely, for stocks that hit new highs, those that end in the short term are 
 - new high
   
   ![new high](images/new_high.jpg)
+
+
+  ###
+  new low us sp 500
+    ![new low us sp 500](images/sp500_new_low.jpeg)
+
+```txt
+2024-08-13 15:25:32,017 - my_logger - INFO - Total count: 1059, success count: 805, success rate: 0.7601510859301227
+2024-08-13 15:25:32,018 - my_logger - INFO - mean: 0.022570667313922037, std: 0.07803245641047711
+2024-08-13 15:25:32,018 - my_logger - INFO - Sharp ratio: 0.28924717165371155
+Final Portfolio Value: 1003403.58
+Sharpe Ratio: OrderedDict([('sharperatio', 2.1323270329065003)])
+max Draw Down: AutoOrderedDict([('len', 182), ('drawdown', 0.1749825330703401), ('moneydown', 1754.0058324934216)])
+return: 0.08043108874514604
+```
+amazing, the new low strategy in the us sp 500 index companies has a high success rate and sharp ratio, and the return is 0.0804, the max draw down is 0.1749, sharp ratio is 2.13.

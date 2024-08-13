@@ -16,9 +16,13 @@ def get_valid_files(data_root, start_date, end_date):
     for item in os.listdir(data_root):
         file = os.path.join(data_root, item)
         df = pd.read_csv(file)
-        df['date'] = pd.to_datetime(df['date'])
-        print(f"Processing {file}, min date: {df['date'].min()}, max date: {df['date'].max()}")
-        if df['date'].min() <= start_date :
+        date_key = 'date'
+        if date_key not in df.columns and 'Date' in df.columns:
+            date_key = 'Date'
+            
+        df[date_key] = pd.to_datetime(df[date_key])
+        print(f"Processing {file}, min date: {df[date_key].min()}, max date: {df[date_key].max()}")
+        if df[date_key].min() <= start_date :
             valid_files.append(file)
     print(f"Total valid files: {len(valid_files)}")
     return valid_files
@@ -125,9 +129,9 @@ def demo_of_ShortTermReversalEffectinStocks():
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    data_root = "data_zh1000"
+    data_root = "data_us"
     test_all_data = True
-    from_date = datetime.datetime(2020, 1, 1)
+    from_date = datetime.datetime(2020, 1, 5)
     to_date = datetime.datetime(2024, 3, 30)
 
     data_names = [
@@ -157,7 +161,7 @@ def demo_of_simple_strategy():
     
     if "hour" in data_names[0]:
         datas = [get_minutely_data(data_name, from_date, to_date) for data_name in data_names]
-    elif "sea" in data_names[0]:
+    elif "us" in data_names[0]:
         datas = [get_sea_data(data_name, from_date, to_date) for data_name in data_names]
     else:
         datas = [get_data(data_name, from_date, to_date) for data_name in data_names]
@@ -175,8 +179,9 @@ def demo_of_simple_strategy():
         # MACDTrendFollowingStrategy, # ok
         # BollingerBandsStrategy, # ok
         # RSRSStrategy, # ok
-        PriceMomumentStrategy,
+        # PriceMomumentStrategy,
         # InvertPriceMomumentStrategy,
+        PriceMomumentStrategyForUS,
         # EMATrendStrategy, 
     ]
 
@@ -186,8 +191,8 @@ def demo_of_simple_strategy():
 def demo_of_multiple_data():
     data_root = 'data'
     stake = 100
-    from_date = datetime.datetime(2022, 1, 1)
-    to_date = datetime.datetime(2024, 12, 31)
+    from_date = datetime.datetime(2020, 2, 1)
+    to_date = datetime.datetime(2024, 5, 31)
 
     total_gain = 0.0
     total_count = 0
