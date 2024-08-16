@@ -2,6 +2,7 @@ from sklearn import svm
 import numpy as np
 import dataPro as dp
 import utils
+import os
 
 class svmPredict():
     def __init__(self,data = None):
@@ -144,42 +145,48 @@ class svmPredict_continuously(dp.dataPro):
 
 
 def svmPredict_demo():
-    file = "./data/sh.600061.csv"
-    data = dp.readData(file)
-    sg = svmPredict(data)
-    x_train,y_train,x_test,y_test = sg.getTrainData()
-    svm_clf = svm.SVR()
-    svm_clf.fit(x_train,y_train)
-    print("svm_clf y_pred:{}, y:{}".format(svm_clf.predict([x_test[2]]),y_test[2]))
-    print("clf score:", svm_clf.score(x_test, y_test))
-    totalNum = 0
-    accNum = 0
-    for x, y in zip(x_test, y_test):
-        y_p = svm_clf.predict([x])
-        totalNum += 1
-        if (y_p > 0 and y > 0) or (y_p < 0 and y < 0):
-            accNum += 1
-    print("totalNum:{},accNum:{}".format(totalNum, accNum))
+    # file = "./data/sh.600061.csv"
+    root = "./data"
+    files = os.listdir(root)
+    
+    for file in files:
+        file = os.path.join(root,file)
+        print("file:",file)
+        data = dp.readData(file)
+        sg = svmPredict(data)
+        x_train,y_train,x_test,y_test = sg.getTrainData()
+        svm_clf = svm.SVR()
+        svm_clf.fit(x_train,y_train)
+        print("svm_clf y_pred:{}, y:{}".format(svm_clf.predict([x_test[2]]),y_test[2]))
+        print("clf score:", svm_clf.score(x_test, y_test))
+        totalNum = 0
+        accNum = 0
+        for x, y in zip(x_test, y_test):
+            y_p = svm_clf.predict([x])
+            totalNum += 1
+            if (y_p > 0 and y > 0) or (y_p < 0 and y < 0):
+                accNum += 1
+        print("totalNum:{},accNum:{}, acc: {}".format(totalNum, accNum, accNum/totalNum))
 
 
 
-    svm_classifier = svm.SVC()
-    y_test2 = np.array(y_test)
-    y_train2 = np.array(y_train)
-    y_train2 = np.where(y_train2>0,1,-1)
-    y_test2 = np.where(y_test2>0,1,-1)
-    svm_classifier.fit(x_train,y_train2)
-    print("classifier score:",svm_classifier.score(x_test,y_test2))
-    totalNum = 0
-    accNum = 0
-    for x,y in zip(x_test,y_test2):
-        y_p = svm_classifier.predict([x])
-        totalNum += 1
-        if y_p == y:
-            accNum += 1
-    print("totalNum:{},accNum:{}".format(totalNum,accNum))
+        svm_classifier = svm.SVC()
+        y_test2 = np.array(y_test)
+        y_train2 = np.array(y_train)
+        y_train2 = np.where(y_train2>0,1,-1)
+        y_test2 = np.where(y_test2>0,1,-1)
+        svm_classifier.fit(x_train,y_train2)
+        print("classifier score:",svm_classifier.score(x_test,y_test2))
+        totalNum = 0
+        accNum = 0
+        for x,y in zip(x_test,y_test2):
+            y_p = svm_classifier.predict([x])
+            totalNum += 1
+            if y_p == y:
+                accNum += 1
+        print("totalNum:{},accNum:{}".format(totalNum,accNum))
 
-    print("svm_classifier y_pred:{}, y:{}".format(svm_classifier.predict([x_test[1]]),y_test2[1]))
+        print("svm_classifier y_pred:{}, y:{}".format(svm_classifier.predict([x_test[1]]),y_test2[1]))
 
 
 

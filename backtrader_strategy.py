@@ -1047,6 +1047,8 @@ class PriceMomumentStrategyForUS(StragegyTemplate):
         ('long_period', 20),
         ('short_period', 5),
         ('top_k', 10),
+        ('volume_period', 20),
+        ('volume_topk', 100), # the top k stocks with the highest volume
     )
     def __init__(self):
         super().__init__()
@@ -1063,16 +1065,26 @@ class PriceMomumentStrategyForUS(StragegyTemplate):
 
     def next(self):
         pass
-        
+
+        sum_volume = [] # item is (i, volume)
+        for i, data in enumerate(self.datas):
+            mean_volume = sum([data.volume[j]*data.close[j] for j in range(-self.params.volume_period, 0)]) / self.params.volume_period
+            sum_volume.append((i, mean_volume))
+
+
+        # sort volume list by volume
+        sum_volume = sorted(sum_volume, key=lambda x: x[1], reverse=True) # highest first
+
+        sum_volume = sum_volume[:self.params.volume_topk]
+
         #  calculate the momentum of each stock
         short_moment_list = [] # item is (i, momentum)
         long_moment_list = []
-        for i, data in enumerate(self.datas):
+        for i, data in sum_volume:
             short_moment_list.append((i, self.short_momentum[i][0]))
             long_moment_list.append((i, self.long_momentum[i][0]))
 
             
-        
         # sort the momentum list by momentum
         short_moment_list = sorted(short_moment_list, key=lambda x: x[1], reverse=False) # lowest first
         long_moment_list = sorted(long_moment_list, key=lambda x: x[1], reverse=True) # highest first
@@ -1109,7 +1121,7 @@ class PriceMomumentStrategyForUS(StragegyTemplate):
                     else:
                         self.buy(data)
         print(f" hold pool size: {len(self.hold_pool.pool.items())}")
-        input("Press Enter to continue...")
+        # input("Press Enter to continue...")
 
 
 

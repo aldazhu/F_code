@@ -169,7 +169,7 @@ def demo_of_simple_strategy():
     stake = 1
 
     strategies = [
-        # NewHighStrategy ,# ok
+        NewHighStrategy ,# ok
         # NewLowStrategy, # ok
         # MovingAverageStrategy, # ok
         # CombinedIndicatorStrategy, # ok
@@ -181,7 +181,7 @@ def demo_of_simple_strategy():
         # RSRSStrategy, # ok
         # PriceMomumentStrategy,
         # InvertPriceMomumentStrategy,
-        PriceMomumentStrategyForUS,
+        # PriceMomumentStrategyForUS,
         # EMATrendStrategy, 
     ]
 
