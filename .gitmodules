@@ -1,3 +1,4 @@
 [submodule "Ashare"]
+	url = https://github.com/mpquant/Ashare.git
 	path = Ashare
-	url = ./Ashare
+	

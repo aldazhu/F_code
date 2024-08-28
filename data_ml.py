@@ -53,7 +53,7 @@ class MLDataTool():
     
 
 class MLDataset(Dataset):
-    def __init__(self, csv_files, pre_days, future_days) -> None:
+    def __init__(self, csv_files, pre_days, future_days, use_catch=False) -> None:
         super().__init__()
         self.data = []
         self.label = []
@@ -61,6 +61,13 @@ class MLDataset(Dataset):
         self.future_days = future_days
         self.ml_data_tool = MLDataTool(pre_days, future_days)
         self.csv_files = []
+
+        if use_catch:
+            if os.path.exists("data.npy") and os.path.exists("label.npy"):
+                print("loading data from the disk")
+                self.data = np.load("data.npy")
+                self.label = np.load("label.npy")
+                return
         for i, file in enumerate(csv_files):
             if not file.endswith(".csv"):
                 continue
@@ -71,6 +78,11 @@ class MLDataset(Dataset):
             X,Y = self.ml_data_tool.get_shift_data(file)
             self.data.extend(X)
             self.label.extend(Y)
+        # save the data to the disk
+        self.data = np.array(self.data)
+        self.label = np.array(self.label)
+        np.save("data.npy", self.data)
+        np.save("label.npy", self.label)
 
     def __len__(self):
         return len(self.data)

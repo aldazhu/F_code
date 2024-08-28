@@ -5,3 +5,6 @@ __pycache__
 /temp2
 /logs
 data_*/
+*_data/
+runs/
+model/
