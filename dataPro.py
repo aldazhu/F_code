@@ -726,7 +726,7 @@ def DemoOfCluster():
             os.makedirs(image_save_folder)
 
         image_save_path =os.path.join(image_save_folder,f"{str(image_num)}_pre{preDays}_feat{futureDays}.png") 
-        # tool.drawOneSample(X[i],Y[i],True,image_save_path)
+        tool.drawOneSample(X[i],Y[i],True,image_save_path)
 
 def demo_of_datapro():
     save_root = "./data_zh1000"
@@ -803,6 +803,26 @@ def demo_of_analysis_data():
     print(item_num_set)
     print(f"total file num:{len(item_num_set)}, min:{min(item_num_set)}, max:{max(item_num_set)}")
 
+def demo_of_get_stock_value():
+
+
+    # 登录系统
+    lg = bs.login()
+
+    # 获取股票基本信息
+    rs = bs.query_stock_basic(code="sh.600000")
+
+    # 打印结果
+    data_list = []
+    while (rs.error_code == '0') & rs.next():
+        data_list.append(rs.get_row_data())
+    result = pd.DataFrame(data_list, columns=rs.fields)
+
+    # 登出系统
+    bs.logout()
+
+    print(result)
+
 
 if __name__ == "__main__":
     pass
@@ -811,9 +831,10 @@ if __name__ == "__main__":
     # downloadDataDemo()
     # demo_of_download_etf()
     # downloadHS300Demo()
-    # DemoOfCluster()
+    DemoOfCluster()
     # demo_of_datapro()
     # demo_of_filter_zero_data()
     # demo_of_datapro()
     # demo_of_write_zh1000_to_txt()
-    demo_of_analysis_data()
+    # demo_of_analysis_data()
+    # demo_of_get_stock_value()

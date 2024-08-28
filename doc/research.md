@@ -164,7 +164,7 @@ Buy stocks that hit a 25-day low, and sell when the stock price exceeds the high
 
 Conversely, for stocks that hit new highs, those that end in the short term are basically losses, and as time increases, the returns become higher. Among the stocks in the hs300, the medium-term momentum effect is more obvious, and the short-term reversal effect is more pronounced.
 
-- new low
+- new low 
   
   ![new low](images/new_low25.jpg)
 - new low hist
@@ -176,9 +176,58 @@ Conversely, for stocks that hit new highs, those that end in the short term are 
   ![new high](images/new_high.jpg)
 
 
-  ###
+### for sp500
+![new low us sp 500](images/sp500_new_low.jpeg)
+
+```txt
+2024-08-16 11:20:46,824 - my_logger - INFO - Total count: 6155, success count: 4187, success rate: 0.680259951259139
+2024-08-16 11:20:46,826 - my_logger - INFO - mean: 0.021284684869758642, std: 0.10618461896335184
+2024-08-16 11:20:46,826 - my_logger - INFO - Sharp ratio: 0.2004497928000736
+Final Portfolio Value: 1017282.87
+Sharpe Ratio: OrderedDict([('sharperatio', 1.0452349681066784)])
+max Draw Down: AutoOrderedDict([('len', 175), ('drawdown', 1.8475848927270107), ('moneydown', 18493.5255269584)])
+return: 0.40627620367840445
+```
+
+## 5. new low finetune
+```python
+class NewLowStrategy(StragegyTemplate):
+    params = (
+        ('highest_window', 15),
+        ('lowest_window', 25),
+        ('ema_period', 5),
+        ('ema_sell_period', 10)
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.high = []
+        self.low = []
+        self.ema = []
+        self.ema_sell = []
+        for i, data in enumerate(self.datas):
+            self.high.append(bt.indicators.Highest(data.high, period=self.params.highest_window))
+            self.low.append(bt.indicators.Lowest(data.low, period=self.params.lowest_window))
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema_sell.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_sell_period))
+
+    def next(self):
+        if self.order:
+            return
+
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0 :
+                if self.low[i][0] < self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
+                    print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
+                    self.order = self.buy(data)
+            else:
+                # hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
+                if data.close[0] > self.high[i][-1] :
+                    print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
+                    self.order = self.sell(data)
+```
   new low us sp 500
-    ![new low us sp 500](images/sp500_new_low.jpeg)
+    ![new low us sp 500](images/sp500_new_low_finetune.jpeg)
 
 ```txt
 2024-08-13 15:25:32,017 - my_logger - INFO - Total count: 1059, success count: 805, success rate: 0.7601510859301227
@@ -190,3 +239,20 @@ max Draw Down: AutoOrderedDict([('len', 182), ('drawdown', 0.1749825330703401), 
 return: 0.08043108874514604
 ```
 amazing, the new low strategy in the us sp 500 index companies has a high success rate and sharp ratio, and the return is 0.0804, the max draw down is 0.1749, sharp ratio is 2.13.
+
+
+for hz300
+![hz300_new_low](images/hz300_new_low_finetune.jpeg)
+
+
+
+
+```txt
+2024-08-16 11:31:06,492 - my_logger - INFO - Total count: 675, success count: 475, success rate: 0.7037037037037037
+2024-08-16 11:31:06,492 - my_logger - INFO - mean: 0.0224919307791907, std: 0.097833968848467
+2024-08-16 11:31:06,492 - my_logger - INFO - Sharp ratio: 0.22989899156629312
+Final Portfolio Value: 999801.19
+Sharpe Ratio: OrderedDict([('sharperatio', -0.1501450230052196)])
+max Draw Down: AutoOrderedDict([('len', 236), ('drawdown', 0.07299242761019854), ('moneydown', 730.3122297455557)])
+return: -0.005045798765825489
+```

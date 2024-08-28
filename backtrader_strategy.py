@@ -260,6 +260,10 @@ class StragegyTemplate(bt.Strategy):
         # print('%s T %s, %s' % (dt.isoformat(),time, txt))
         self.logger.info('%s T %s, %s' % (dt.isoformat(),time, txt))
 
+    def query_holding_number(self):
+        holding_number = len(self.hold_pool.pool)
+        self.logger.info("Holding number: %s" % holding_number)
+
     def stop_loss_watch_dog(self):
         for i, data in enumerate(self.datas):
             if data._name in self.hold_pool.pool:
@@ -351,7 +355,6 @@ class StragegyTemplate(bt.Strategy):
         plt.hist(ratio, bins=50)
         plt.xlabel('Earning ratio')
         plt.ylabel('Frequency')
-
 
         plt.show()
 
@@ -760,7 +763,7 @@ class NewHighStrategy(StragegyTemplate):
 class NewLowStrategy(StragegyTemplate):
     params = (
         ('highest_window', 15),
-        ('lowest_window', 25),
+        ('lowest_window', 50),
         ('ema_period', 5),
         ('ema_sell_period', 10)
     )
@@ -783,7 +786,7 @@ class NewLowStrategy(StragegyTemplate):
 
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0 :
-                if self.low[i][0] < self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
+                if self.low[i][0] > self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
             else:
@@ -791,6 +794,7 @@ class NewLowStrategy(StragegyTemplate):
                 if data.close[0] > self.high[i][-1] :
                     print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
                     self.order = self.sell(data)
+        self.query_holding_number()
         # stop loss
         # self.stop_loss_watch_dog()
         # self.stop_eaning_watch_dog()
@@ -946,7 +950,7 @@ class ShortTermReversalEffectinStocks(StragegyTemplate):
 # have performed well in the past will continue to perform well in the future, and vice versa.
 class PriceMomumentStrategy(StragegyTemplate):
     params = (
-        ('period', 20),
+        ('period', 30),
         ('ema_period', 30),
         ('top_k', 10),
     )
@@ -994,6 +998,8 @@ class PriceMomumentStrategy(StragegyTemplate):
                     self.sell(data)
         
         # input("Press Enter to continue...")
+        self.query_holding_number()
+
 
         
 class InvertPriceMomumentStrategy(StragegyTemplate):
@@ -1039,14 +1045,17 @@ class InvertPriceMomumentStrategy(StragegyTemplate):
                 if self.hold_pool.get_record(stock_code) is not None:
                     
                     self.sell(data)
+        
+        self.query_holding_number()
+
 
 # short the topk stocks with the highest return in the past month
 # long the topk stocks with the lowest return in the past week
 class PriceMomumentStrategyForUS(StragegyTemplate):
     params = (
         ('long_period', 20),
-        ('short_period', 5),
-        ('top_k', 10),
+        ('short_period', 15),
+        ('top_k', 5),
         ('volume_period', 20),
         ('volume_topk', 100), # the top k stocks with the highest volume
     )
@@ -1120,7 +1129,9 @@ class PriceMomumentStrategyForUS(StragegyTemplate):
                         self.sell(data)
                     else:
                         self.buy(data)
-        print(f" hold pool size: {len(self.hold_pool.pool.items())}")
+        
+        self.query_holding_number()
+
         # input("Press Enter to continue...")
 
 
