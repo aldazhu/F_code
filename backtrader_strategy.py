@@ -12,15 +12,15 @@ class MyData(btfeeds.GenericCSVData):
         ('fromdate', datetime.datetime(2022, 11, 1)),
         ('todate', datetime.datetime(2023, 12, 31)),
         ('dtformat', ('%Y-%m-%d')),
-        ('tmformat', ('%H.%M.%S')),
+        # ('tmformat', ('%H.%M.%S')),
         ('datetime', 1),
-        ('time', -1),
+        # ('time', -1),
         ('open', 3),
         ('high', 4),
         ('low', 5),
         ('close', 6),
         ('volume', 8),
-        ('openinterest', -1)
+        # ('openinterest', -1)
     )
 
 class MyMinutelyData(btfeeds.GenericCSVData):
@@ -1162,3 +1162,45 @@ class EMATrendStrategy(StragegyTemplate):
             else:
                 if self.ema[i][0] < self.ema[i][-1] :
                     self.order = self.sell(data)
+#Long Lower Shadow Candlestick
+class LongLowerShadowCandlestickStrategy(StragegyTemplate):
+    params = (
+        ('low_shadow_length', 3),
+        ('min_bar_length', 0.001),
+        ('ema_period', 5),
+        ('hold_days', 3),
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.ema = []
+        for i, data in enumerate(self.datas):
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+        
+    def is_long_lower_shadow(self, data_index):
+        if self.ema[data_index][-1] < self.ema[data_index][-2] :
+            if self.datas[data_index].close[0] > self.datas[data_index].open[0]:
+                shadow_length = min(self.datas[data_index].open[0], self.datas[data_index].close[0]) - self.datas[data_index].low[0]
+                bar_length = abs(self.datas[data_index].close[0] - self.datas[data_index].open[0])
+                bar_length_ratio = bar_length / self.datas[data_index].close[0]
+                if shadow_length > bar_length * self.params.low_shadow_length  and bar_length_ratio > self.params.min_bar_length:
+                    return True
+        return False
+        
+
+    def next(self):
+        if self.order:
+            return
+        
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0:
+                if self.is_long_lower_shadow(i):
+                    self.order = self.buy(data)
+            else:
+                hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
+                if hold_days >= self.params.hold_days:
+                    self.order = self.sell(data)
+        
+        self.query_holding_number()
+
+        
