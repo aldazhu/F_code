@@ -8,7 +8,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-from data_ml import MLDataset
+from data_ml import MLDataset, IndictorDataset
 
 from ml_model import TemporalConvNet, MyTemporalConvNet, MLP
 
@@ -80,6 +80,8 @@ def train(model, train_loader, test_loader, loss_function, optimizer, num_epochs
             # Print the loss every 100 iterations
             if i % 100 == 0:
                 print(f"Epoch {epoch}, Iteration {i}, Loss: {loss.item()}")
+                # input("press any key to continue")
+
                 writer.add_scalar("Loss/train", loss.item(), epoch * len(train_loader) + i)
             
         # Evaluate the model on the test
@@ -154,7 +156,7 @@ def test(model, test_loader,  device):
             print(f"output : {output}")
             print(f"y : {y}")
             print(f" {success_count} / {total_count}")
-            input("Press Enter to continue...")
+            # input("Press Enter to continue...")
             
         print(f"IC: {total_ic / len(test_loader)}, IR: {total_ir / len(test_loader)}")
     plt.scatter(label, predict)
@@ -305,10 +307,101 @@ def test_MLP():
 
     test(mlp, test_loader,  device)
 
+def train_MLP_indicator():
+    
+    save_dir = "model/MLP_indicator"
+    writer = SummaryWriter(save_dir)
+    num_epochs = 100
+    batch_size = 64
+    pre_days = 1
+    future_days = 10
+    data_root = "data"
+    
+    train_ratio = 0.8
+    learning_rate = 0.001
+    hidden_dim = 256
+    output_dim = 1
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"device: {device}")
+       
+    csv_files = [os.path.join(data_root, item) for item in os.listdir(data_root)]
+    train_files = random.sample(csv_files, int(len(csv_files) * train_ratio))
+    test_files = [file for file in csv_files if file not in train_files]
+    with open(f"{save_dir}/train_files.txt", "w") as f:
+        for file in train_files:
+            f.write(file + "\n")
+    with open(f"{save_dir}/test_files.txt", "w") as f:
+        for file in test_files:
+            f.write(file + "\n")
+
+    train_dataset = IndictorDataset(train_files, future_days=future_days)
+    test_dataset = IndictorDataset(test_files, future_days=future_days)
+
+    # get data shape
+    input_data, target = train_dataset[0]
+    print(f"input_data shape: {input_data.shape}")
+    print(f"target shape: {target.shape}")
+    print(f"target: {target}")
+    input_shape = input_data.shape
+    target_shape = target.shape
+    output_dim = target_shape[0] if len(target_shape) > 1 else 1
+    mlp = MLP(input_shape[0], pre_days, hidden_dim, output_dim)
+    print(f"device: {device}")
+    print(mlp)
+    print(f"parameters: {sum(p.numel() for p in mlp.parameters())}")
+    mlp.to(device)
+
+    # Create data loaders
+
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+    # Define the loss function and optimizer
+
+    loss_function = nn.MSELoss()
+
+    optimizer = torch.optim.Adam(mlp.parameters(), lr=learning_rate)
+
+    train(mlp, train_loader, test_loader, loss_function, optimizer, num_epochs, writer, device, save_dir)
+
+    test(mlp, test_loader,  device)
+
+def test_MLP_indicator():
+    batch_size = 128
+    pre_days = 1
+    future_days = 10
+    hidden_dim = 256
+
+    save_dir = "model/MLP_indicator"  
+    model_path = f"{save_dir}/model_best.pth"
+    test_csv_file_dict = f"{save_dir}/test_files.txt"
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"device: {device}")
+    test_files = []
+    with open(test_csv_file_dict, "r") as f:
+        for line in f:
+            test_files.append(line.strip())
+    
+    test_dataset = IndictorDataset(test_files, future_days=future_days)
+    input_data, target = test_dataset[0]
+    input_shape = input_data.shape
+    target_shape = target.shape
+    print(input_shape)
+    print(target_shape)
+    output_dim = target_shape[0] if len(target_shape) > 1 else 1
+    mlp = MLP(input_shape[0], pre_days, hidden_dim, output_dim)
+    mlp.load_state_dict(torch.load(model_path))
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+    test(mlp, test_loader,  device)
+
 if __name__ == "__main__":
     # train_TCN()
     # train_MLP()
-    test_MLP()
+    # test_MLP()
+    # train_MLP_indicator()
+    test_MLP_indicator()
 
 
 

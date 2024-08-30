@@ -6,7 +6,122 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from my_logger import logger
 
+import talib as ta
 
+
+class DataIndicator():
+    def __init__(self) -> None:
+        pass
+
+    def get_indicator(self, file_path):
+        data = pd.read_csv(file_path)
+        indicators = {}
+        indicators["MA5"] = ta.MA(data["close"], timeperiod=5)
+        indicators["MA30"] = ta.MA(data["close"], timeperiod=30)
+
+        # RSI
+        indicators["RSI"] = ta.RSI(data["close"], timeperiod=14)
+
+        # CCI
+        indicators["CCI"] = ta.CCI(data["high"], data["low"], data["close"], timeperiod=14)
+
+        # Stochastic Oscillator
+        indicators["slowk"], indicators["slowd"] = ta.STOCH(data["high"], data["low"], data["close"], fastk_period=5, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)
+
+        # ADX
+        indicators["ADX"] = ta.ADX(data["high"], data["low"], data["close"], timeperiod=14)
+
+        # Momentum
+        indicators["MOM"] = ta.MOM(data["close"], timeperiod=10)
+
+        indicators["OBV"] = ta.OBV(data["close"], data["volume"])
+
+        # MACD
+        indicators["macd"], indicators["signal"], indicators["hist"] = ta.MACD(data["close"], fastperiod=12, slowperiod=26, signalperiod=9)
+
+        # ATR
+        indicators["ATR"] = ta.ATR(data["high"], data["low"], data["close"], timeperiod=14)
+
+        # ROC
+        indicators["ROC"] = ta.ROC(data["close"], timeperiod=10)
+        
+        return indicators
+    
+class IndictorDataset(Dataset):
+    def __init__(self, csv_files, future_days=10) -> None:
+        super().__init__()
+        self.data = []
+        self.indicator = []
+        self.data_indicator = DataIndicator()
+        self.data = []
+        self.label = []
+        for i, file in enumerate(csv_files):
+            if not file.endswith(".csv"):
+                continue
+            if not os.path.isfile(file):
+                logger.info(f"{file} is not a file")
+                continue
+            logger.info(f'{i} processing {file}')
+            indicators = self.data_indicator.get_indicator(file)
+            data = pd.read_csv(file)
+            assert len(data["close"]) == len(indicators["MA5"])
+
+            start_index = 0
+            length = len(indicators["MA5"])
+            for index in range(0, length):
+                for key in indicators:
+                    if np.isnan(indicators[key][index]) :
+                        start_index += 1
+                        break
+            print(f"start_index: {start_index}")
+            for key in indicators:
+                indicators[key] = indicators[key][start_index:]
+
+            # normalize the data
+            indicators["MA5"] = (indicators["MA5"] ) / indicators["MA5"][start_index]
+            indicators["MA30"] = (indicators["MA30"] ) / indicators["MA30"][start_index]
+            indicators["OBV"] = (indicators["OBV"] - indicators["OBV"][start_index]) / indicators["OBV"][start_index]
+
+            for i in range(start_index, length - future_days):
+                x_i = []
+                for key in indicators:
+                    x_i.append(indicators[key][i])
+                y_i = (data["close"][i+future_days] - data["close"][i]) / data["close"][i]
+                if np.isnan(y_i) or np.isinf(y_i):
+                    continue
+                if np.isnan(x_i).any() or np.isinf(x_i).any():
+                    continue
+                self.data.append(x_i)
+                self.label.append(y_i)
+        self.data = np.array(self.data, dtype=np.float32)
+        self.label = np.array(self.label, dtype=np.float32)
+
+    def __len__(self):
+        return len(self.data)
+    
+    def __getitem__(self, index):
+        return self.data[index], self.label[index]
+
+    
+
+def demo_of_DataIndicator():
+    file_path = 'data/sh.600009.csv'
+    data_indicator = DataIndicator()
+    indicators = data_indicator.get_indicator(file_path)
+    for key in indicators:
+        print(f"{key}: {indicators[key]}")
+        print(f"{key} shape: {len(indicators[key])}")
+
+def demo_of_IndictorDataset():
+    csv_root = 'mini_data'
+    csv_files = [os.path.join(csv_root, item) for item in os.listdir(csv_root)]
+    indictor_dataset = IndictorDataset(csv_files)
+    for i in range(len(indictor_dataset)):
+        data, label = indictor_dataset[i]
+        print(data)
+        print(label)
+        input("press any key to continue")
+        
 
 # get bach data
 class MLDataTool():
@@ -126,4 +241,6 @@ def demo_of_MLDataTool():
 
 if __name__ == "__main__":
     # demo_of_MLDataTool()
-    demo_of_MLDataset()
+    # demo_of_MLDataset()
+    # demo_of_DataIndicator()
+    demo_of_IndictorDataset()

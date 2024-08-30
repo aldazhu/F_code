@@ -1157,10 +1157,10 @@ class EMATrendStrategy(StragegyTemplate):
 
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0:
-                if self.ema[i][0] > self.ema[i][-1] :
+                if self.ema[i][0] >= self.ema[i][-1] and self.ema[i][-1] >= self.ema[i][-2]:
                     self.order = self.buy(data)
             else:
-                if self.ema[i][0] < self.ema[i][-1] :
+                if self.ema[i][0] < self.ema[i][-1] and self.ema[i][-1] < self.ema[i][-2]:
                     self.order = self.sell(data)
 #Long Lower Shadow Candlestick
 class LongLowerShadowCandlestickStrategy(StragegyTemplate):

@@ -99,7 +99,12 @@ class MLP(nn.Module):
 
     def forward(self, x):
         x = self.flatten(x)
+        # print(f"x shape: {x.shape}")
+        # print(f"x: {x}")
         logits = self.linear_relu_stack(x)
+        # print(f"logits shape: {logits.shape}")
+        # print(f"logits: {logits}")
+        # input("press any key to continue")
         return logits
     
 def demo_of_MLP_model():
