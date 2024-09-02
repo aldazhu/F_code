@@ -494,6 +494,8 @@ class RSIStrategy(StragegyTemplate):
             else:
                 if self.rsi[i][0] > self.params.rsi_lower and self.rsi[i][-1] <= self.params.rsi_lower:
                     self.order = self.buy(data)
+        self.query_holding_number()
+        
         
 
 class CCIStrategy(StragegyTemplate):
@@ -759,6 +761,7 @@ class NewHighStrategy(StragegyTemplate):
         # stop loss
         # self.stop_loss_watch_dog()
         # self.stop_eaning_watch_dog()
+        self.query_holding_number()
 
 class NewLowStrategy(StragegyTemplate):
     params = (
@@ -786,7 +789,7 @@ class NewLowStrategy(StragegyTemplate):
 
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0 :
-                if self.low[i][0] > self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
+                if self.low[i][0] < self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
             else:
@@ -1055,7 +1058,7 @@ class PriceMomumentStrategyForUS(StragegyTemplate):
     params = (
         ('long_period', 20),
         ('short_period', 15),
-        ('top_k', 5),
+        ('top_k', 10),
         ('volume_period', 20),
         ('volume_topk', 100), # the top k stocks with the highest volume
     )
@@ -1162,6 +1165,7 @@ class EMATrendStrategy(StragegyTemplate):
             else:
                 if self.ema[i][0] < self.ema[i][-1] and self.ema[i][-1] < self.ema[i][-2]:
                     self.order = self.sell(data)
+        self.query_holding_number()
 #Long Lower Shadow Candlestick
 class LongLowerShadowCandlestickStrategy(StragegyTemplate):
     params = (
