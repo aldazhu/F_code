@@ -1141,7 +1141,7 @@ class PriceMomumentStrategyForUS(StragegyTemplate):
 
 class EMATrendStrategy(StragegyTemplate):
     params = (
-        ('ema_period', 30),
+        ('ema_period', 20),
         ('ema_period2', 10),
     )
 
@@ -1151,7 +1151,7 @@ class EMATrendStrategy(StragegyTemplate):
         self.ema2 = []
         for i, data in enumerate(self.datas):
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
-            # self.ema2.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period2))
+            self.ema2.append(bt.indicators.ExponentialMovingAverage(data.volume, period=self.params.ema_period2))
 
 
     def next(self):
@@ -1160,12 +1160,16 @@ class EMATrendStrategy(StragegyTemplate):
 
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0:
-                if self.ema[i][0] >= self.ema[i][-1] and self.ema[i][-1] >= self.ema[i][-2]:
+                if self.ema[i][0] >= self.ema[i][-1] and self.ema[i][-1] >= self.ema[i][-2] and self.ema2[i][0] > self.ema2[i][-1]:
                     self.order = self.buy(data)
             else:
                 if self.ema[i][0] < self.ema[i][-1] and self.ema[i][-1] < self.ema[i][-2]:
                     self.order = self.sell(data)
         self.query_holding_number()
+        self.stop_loss_watch_dog()
+
+
+
 #Long Lower Shadow Candlestick
 class LongLowerShadowCandlestickStrategy(StragegyTemplate):
     params = (
@@ -1207,4 +1211,34 @@ class LongLowerShadowCandlestickStrategy(StragegyTemplate):
         
         self.query_holding_number()
 
+class DiffStrategy(StragegyTemplate):
+    params = (
+        ('ema_period', 15),
+        ('diff_period', 20),
+        ('diff_threshold', 0.1),
+        ('hold_days', 30),
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.ema = []
+        self.diff = []
+        for i, data in enumerate(self.datas):
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.diff.append(Diff(data, ema_period=self.params.diff_period))
+
+    def next(self):
+        if self.order:
+            return
         
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0:
+                # print(f"self.diff[i][0]: {self.diff[i][0]}, self.diff[i][-1]: {self.diff[i][-1]}")
+                if self.diff[i][-1] < 0.0 - self.params.diff_threshold and self.diff[i][0] > 0.0 - self.params.diff_threshold:
+                    self.order = self.buy(data)
+            else:
+                hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
+                if self.data.close[0] > self.ema[i][0]  or hold_days >= self.params.hold_days:
+                    self.order = self.sell(data)
+        
+        self.query_holding_number()

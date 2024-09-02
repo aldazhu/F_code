@@ -7,6 +7,12 @@ import torch.optim as optim
 from xgboost import XGBClassifier, XGBRegressor
 import xgboost as xgb
 from sklearn.model_selection import GridSearchCV
+from sklearn import svm
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.ensemble import RandomForestClassifier
+
+import joblib
 
 import random
 import os
@@ -468,17 +474,13 @@ def train_xgboost_classifier():
 
 def train_xgboost_regressor():
     save_dir = "model/MLP_indicator"
-    writer = SummaryWriter(save_dir)
-
+    
     future_days = 30
     data_root = "data_us"
     one_hot = False
     
     train_ratio = 0.8
-   
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"device: {device}")
-       
+
     csv_files = [os.path.join(data_root, item) for item in os.listdir(data_root)]
     train_files = random.sample(csv_files, int(len(csv_files) * train_ratio))
     test_files = [file for file in csv_files if file not in train_files]
@@ -592,6 +594,191 @@ def demo_of_xgboost_feature():
     xgb.plot_importance(bst)
     plt.show()
 
+def demo_of_train_svm():
+    save_dir = "model/MLP_indicator"
+    
+    future_days = 30
+    data_root = "data"
+    one_hot = False
+    
+    train_ratio = 0.8
+
+    csv_files = [os.path.join(data_root, item) for item in os.listdir(data_root)]
+    train_files = random.sample(csv_files, int(len(csv_files) * train_ratio))
+    test_files = [file for file in csv_files if file not in train_files]
+    with open(f"{save_dir}/train_files.txt", "w") as f:
+        for file in train_files:
+            f.write(file + "\n")
+    with open(f"{save_dir}/test_files.txt", "w") as f:
+        for file in test_files:
+            f.write(file + "\n")
+
+    train_dataset = IndictorDataset(train_files, future_days=future_days,one_hot_flag=one_hot)
+    test_dataset = IndictorDataset(test_files, future_days=future_days, one_hot_flag=one_hot)
+
+    X_train, y_train = train_dataset.get_data_and_label()
+    X_test, y_test = test_dataset.get_data_and_label()
+
+    print(f"X_train shape: {X_train.shape}")
+    print(f"y_train shape: {y_train.shape}")
+    clf = svm.SVR()
+    clf.fit(X_train, y_train)
+
+    # save model
+    import joblib
+    joblib.dump(clf, f"{save_dir}/svm_model_best.pkl")
+    print(f"model saved to {save_dir}/svm_model_best.pkl")
+    
+    y_pred = clf.predict(X_test)
+
+    # calculate the IC and IR
+    ic = np.corrcoef(y_pred, y_test)[0, 1]
+    print(f"IC: {ic}")
+
+    plt.scatter(y_test, y_pred)
+    plt.xlabel("y_test")
+    plt.ylabel("y_pred")
+    plt.show()
+
+def demo_of_KNN():
+    save_dir = "model/MLP_indicator"
+    
+    future_days = 30
+    data_root = "data"
+    one_hot = False
+    
+    train_ratio = 0.8
+
+    csv_files = [os.path.join(data_root, item) for item in os.listdir(data_root)]
+    train_files = random.sample(csv_files, int(len(csv_files) * train_ratio))
+    test_files = [file for file in csv_files if file not in train_files]
+    with open(f"{save_dir}/train_files.txt", "w") as f:
+        for file in train_files:
+            f.write(file + "\n")
+    with open(f"{save_dir}/test_files.txt", "w") as f:
+        for file in test_files:
+            f.write(file + "\n")
+
+    train_dataset = IndictorDataset(train_files, future_days=future_days,one_hot_flag=one_hot)
+    test_dataset = IndictorDataset(test_files, future_days=future_days, one_hot_flag=one_hot)
+
+    X_train, y_train = train_dataset.get_data_and_label()
+    X_test, y_test = test_dataset.get_data_and_label()
+
+    for i in range(len(y_train)):
+        if y_train[i] > 0.05:
+            y_train[i] = 1
+        elif y_train[i] < 0.00:
+            y_train[i] = 0
+        else:
+            y_train[i] = 1
+    for i in range(len(y_test)):
+        if y_test[i] > 0.05:
+            y_test[i] = 1
+        elif y_test[i] < 0.0:
+            y_test[i] = 0
+        else:
+            y_test[i] = 1
+
+    print(f"X_train shape: {X_train.shape}")
+    print(f"y_train shape: {y_train.shape}")
+    clf = KNeighborsClassifier(n_neighbors=20)
+    clf.fit(X_train, y_train)
+
+    # save model
+    
+    joblib.dump(clf, f"{save_dir}/knn_model_best.pkl")
+    print(f"model saved to {save_dir}/knn_model_best.pkl")
+    
+    y_pred = clf.predict(X_test)
+
+    # calculate the IC and IR
+    ic = np.corrcoef(y_pred, y_test)[0, 1]
+    print(f"IC: {ic}")
+
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"accuracy: {accuracy}")
+
+    confusion_matrix_result = confusion_matrix(y_test, y_pred)
+    print(f"confusion_matrix: \n {confusion_matrix_result}")
+
+    print('Classification Report')
+    print(classification_report(y_test, y_pred))
+
+    for i in range(len(y_pred)):
+        print(f"y_test: {y_test[i]}")
+        print(f"y_pred: {y_pred[i]}")
+        input("press any key to continue")
+
+def demo_of_random_forest():
+    save_dir = "model/MLP_indicator"
+    
+    future_days = 30
+    data_root = "data_us"
+    one_hot = False
+    
+    train_ratio = 0.8
+
+    csv_files = [os.path.join(data_root, item) for item in os.listdir(data_root)]
+    train_files = random.sample(csv_files, int(len(csv_files) * train_ratio))
+    test_files = [file for file in csv_files if file not in train_files]
+    with open(f"{save_dir}/train_files.txt", "w") as f:
+        for file in train_files:
+            f.write(file + "\n")
+    with open(f"{save_dir}/test_files.txt", "w") as f:
+        for file in test_files:
+            f.write(file + "\n")
+
+    train_dataset = IndictorDataset(train_files, future_days=future_days,one_hot_flag=one_hot)
+    test_dataset = IndictorDataset(test_files, future_days=future_days, one_hot_flag=one_hot)
+
+    X_train, y_train = train_dataset.get_data_and_label()
+    X_test, y_test = test_dataset.get_data_and_label()
+
+    for i in range(len(y_train)):
+        if y_train[i] > 0.05:
+            y_train[i] = 2
+        elif y_train[i] < -0.00:
+            y_train[i] = 0
+        else:
+            y_train[i] = 1
+    for i in range(len(y_test)):
+        if y_test[i] > 0.05:
+            y_test[i] = 2
+        elif y_test[i] < 0.0:
+            y_test[i] = 0
+        else:
+            y_test[i] = 1
+
+    print(f"X_train shape: {X_train.shape}")
+    print(f"y_train shape: {y_train.shape}")
+    clf = RandomForestClassifier(n_estimators=100)
+    clf.fit(X_train, y_train)
+
+    # save model
+    
+    joblib.dump(clf, f"{save_dir}/knn_model_best.pkl")
+    print(f"model saved to {save_dir}/knn_model_best.pkl")
+    
+    y_pred = clf.predict(X_test)
+
+    # calculate the IC and IR
+    ic = np.corrcoef(y_pred, y_test)[0, 1]
+    print(f"IC: {ic}")
+
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"accuracy: {accuracy}")
+
+    confusion_matrix_result = confusion_matrix(y_test, y_pred)
+    print(f"confusion_matrix: \n {confusion_matrix_result}")
+
+    print('Classification Report')
+    print(classification_report(y_test, y_pred))
+
+    for i in range(len(y_pred)):
+        print(f"y_test: {y_test[i]}")
+        print(f"y_pred: {y_pred[i]}")
+        input("press any key to continue")
 
 
 if __name__ == "__main__":
@@ -603,7 +790,10 @@ if __name__ == "__main__":
     # train_xgboost_classifier()
     # train_xgboost_regressor()
     # demo_of_load_xgboost_model()
-    demo_of_xgboost_feature()
+    # demo_of_xgboost_feature()
+    # demo_of_train_svm()
+    # demo_of_KNN()
+    demo_of_random_forest()
 
 
 
