@@ -129,10 +129,10 @@ def demo_of_ShortTermReversalEffectinStocks():
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    data_root = "data_us"
+    data_root = "data_zh1000"
     test_all_data = True
-    from_date = datetime.datetime(2020, 1, 5)
-    to_date = datetime.datetime(2024, 3, 30)
+    from_date = datetime.datetime(2022, 1, 5)
+    to_date = datetime.datetime(2024, 1, 30)
 
     data_names = [
         f'{data_root}/sz.300628.csv',
@@ -169,7 +169,7 @@ def demo_of_simple_strategy():
     stake = 1
 
     strategies = [
-        NewHighStrategy ,# ok
+        # NewHighStrategy ,# ok
         # NewLowStrategy, # ok
         # MovingAverageStrategy, # ok
         # CombinedIndicatorStrategy, # ok
@@ -183,6 +183,9 @@ def demo_of_simple_strategy():
         # InvertPriceMomumentStrategy,
         # PriceMomumentStrategyForUS,
         # EMATrendStrategy, 
+        # LongLowerShadowCandlestickStrategy,
+        # DiffStrategy,
+        XGBoostStrategy,
     ]
 
     test_backtrader(datas, strategies=strategies, cash=1000000.0, commission=0.001, stake=stake)
@@ -272,7 +275,6 @@ def demo_of_multiple_stock():
 
     # Print the profit
     profit = cerebro.broker.getvalue() - cash
-
 
 
 

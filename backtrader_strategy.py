@@ -4,8 +4,12 @@ import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 
+import backtrader.talib as ta
 from backtrader_indicator import RSRS, RSRS_Norm, Diff
 from my_logger import logger
+
+
+from xgboost import XGBClassifier, XGBRegressor
 
 class MyData(btfeeds.GenericCSVData):
     params = (
@@ -1242,3 +1246,146 @@ class DiffStrategy(StragegyTemplate):
                     self.order = self.sell(data)
         
         self.query_holding_number()
+
+class XGBoostStrategy(StragegyTemplate):
+    params = (
+        ('rsi_period',14),
+        ('cci_period',14),
+        ('fastk_period',5),
+        ('slowk_period',3),
+        ('slowd_period',3),
+        ('adx_period',14),
+        ('mom_period',10),
+        ('macd_fast_period',12),
+        ('macd_slow_period',26),
+        ('macd_signal_period',9),
+        ('atr_period',14),
+        ('roc_period',10),
+        ('min_start_index', 60),
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.rsi = []
+        self.cci = []
+        # self.fastk = []
+        self.slowk = []
+        self.slowd = []
+        self.adx = []
+        self.mom = []
+        self.macd = []
+        self.atr = []
+        self.roc = []
+        self.indictors_list = []
+        self.model_path = "model/xgboost/xgboost_model_regressor.json"
+        self.bst = XGBRegressor()
+        self.bst.load_model(self.model_path)
+        self.pre_days = 9
+        self.first_obv = []
+        self.emas = []
+        for i, data in enumerate(self.datas):
+            # RSI
+            self.emas.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.min_start_index))
+            indictors = {}
+            indictors["RSI"] = ta.RSI(data.close, timeperiod=self.params.rsi_period)
+
+            # CCI
+            indictors["CCI"] = ta.CCI(data.high, data.low, data.close, timeperiod=self.params.cci_period)
+
+            # Stochastic Oscillator
+            # indictors["slowk"], indictors["slowd"] = ta.STOCH(data.high, data.low, data.close, fastk_period=5, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)
+
+            stoch = ta.STOCH(data.high, data.low, data.close,
+                  fastk_period=5, slowk_period=3, slowk_matype=0,
+                  slowd_period=3, slowd_matype=0)
+            # print(stoch)
+            # print attibute
+            
+            # 获取 %K 和 %D 线
+            indictors["slowk"] = stoch.slowk
+            indictors["slowd"] = stoch.slowd
+
+            # ADX
+            indictors["ADX"] = ta.ADX(data.high, data.low, data.close, timeperiod=self.params.adx_period)
+
+            # Momentum
+            indictors["MOM"] = ta.MOM(data.close, timeperiod=self.params.mom_period)
+
+            indictors["OBV"] = ta.OBV(data.close, data.volume)
+
+            # MACD
+            macd = ta.MACD(data.close, fastperiod=12, slowperiod=26, signalperiod=9)
+            indictors["macd"], indictors["signal"], indictors["hist"] = macd.macd, macd.macdsignal, macd.macdhist
+            # ATR
+            indictors["ATR"] = ta.ATR(data.high, data.low, data.close, timeperiod=self.params.atr_period)
+
+            # ROC
+            indictors["ROC"] = ta.ROC(data.close, timeperiod=self.params.roc_period)
+            # start_index = 0
+            # length = len(indictors["RSI"])
+            # for index in range(0, length):
+            #     for key in indictors:
+            #         if np.isnan(indictors[key][index]) :
+            #             start_index += 1
+            #             break
+            # print(f"start_index: {start_index}")
+            # indictors["OBV"] = (indictors["OBV"] - indictors["OBV"][start_index]) / indictors["OBV"][start_index]
+            self.indictors_list.append(indictors)
+
+
+    def get_predays_indictor(self, data_index, time_index):
+        x_i = []
+        
+        for key in self.indictors_list[0]:
+            if key == "OBV":
+                x = []
+                for i in range(self.pre_days):
+                    normal_obv = (self.indictors_list[data_index][key][time_index-self.pre_days+i] - self.first_obv[data_index]) / self.first_obv[data_index]
+                    x.append(normal_obv)
+                
+                x_i.extend(x)
+            else:
+                # it does not support the clice operation
+                x = []
+                for i in range(self.pre_days):
+                    x.append(self.indictors_list[data_index][key][time_index-self.pre_days+i])
+                x_i.extend(x)
+
+        if np.isnan(x_i).any() or np.isinf(x_i).any():
+            return None
+        
+        return x_i
+
+
+    def next(self):
+        if self.order:
+            return
+        
+        is_first = True
+        if is_first:
+            for i, data in enumerate(self.datas):
+                self.first_obv.append(self.indictors_list[i]["OBV"][0])
+            is_first = False
+
+        
+        for i, data in enumerate(self.datas):
+            x_i = self.get_predays_indictor(i, 0)
+            if x_i is None:
+                continue
+            x_i = np.array(x_i).reshape(1, -1)
+            # print(f"x_i shae: {x_i.shape}")
+            y_i = self.bst.predict(x_i)
+
+            # print(f"x_i: \n {x_i}")
+            # print(f"y_i_pred: \n {y_i}")
+            if self.getposition(data).size <= 0:
+                if y_i[0] > 0.2:
+                    self.order = self.buy(data)
+            else:
+                hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
+                if hold_days >= 30 or y_i[0] < -0.1:
+                    self.order = self.sell(data)
+        
+        self.query_holding_number()
+
+        
