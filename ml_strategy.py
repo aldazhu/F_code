@@ -447,7 +447,7 @@ def train_xgboost_classifier():
     X_test, y_test = test_dataset.get_data_and_label()
     # create model instance
     bst = XGBClassifier()
-    bst = XGBRegressor()
+    # bst = XGBRegressor()
     # 定义要搜索的超参数网格
     param_grid = {
         'n_estimators': [50, 100, 200],
@@ -466,6 +466,17 @@ def train_xgboost_classifier():
     bst.fit(X_train, y_train)
     # make predictions
     preds = bst.predict(X_test)
+    ic = np.corrcoef(preds, y_test)[0, 1]
+    print(f"IC: {ic}")
+
+    accuracy = accuracy_score(y_test, preds)
+    print(f"accuracy: {accuracy}")
+
+    confusion_matrix_result = confusion_matrix(y_test, preds)
+    print(f"confusion_matrix: \n {confusion_matrix_result}")
+
+    print('Classification Report')
+    print(classification_report(y_test, preds))
 
     for i in range(len(preds)):
         print(f"y_test: {y_test[i]}")
@@ -476,7 +487,8 @@ def train_xgboost_regressor():
     save_dir = "model/MLP_indicator"
     
     future_days = 30
-    data_root = "data_us"
+    pre_days = 10
+    data_root = "data"
     one_hot = False
     
     train_ratio = 0.8
@@ -491,35 +503,42 @@ def train_xgboost_regressor():
         for file in test_files:
             f.write(file + "\n")
 
-    train_dataset = IndictorDataset(train_files, future_days=future_days,one_hot_flag=one_hot)
-    test_dataset = IndictorDataset(test_files, future_days=future_days, one_hot_flag=one_hot)
+    train_dataset = IndictorDataset(train_files, future_days=future_days,pre_days=pre_days ,one_hot_flag=one_hot)
+    test_dataset = IndictorDataset(test_files, future_days=future_days, pre_days=pre_days ,one_hot_flag=one_hot)
 
     X_train, y_train = train_dataset.get_data_and_label()
     X_test, y_test = test_dataset.get_data_and_label()
-    # create model instance
-    bst = XGBRegressor()
-    # 定义要搜索的超参数网格
-    param_grid = {
-        'n_estimators': [50, 100, 200],
-        'max_depth': [2, 4, 6],
-        'learning_rate': [0.01, 0.1, 0.2],
-        'objective': ['reg:squarederror']
-    }
-    grid_search = GridSearchCV(bst, param_grid, cv=5, scoring='neg_mean_squared_error')
+    # # create model instance
+    # bst = XGBRegressor()
+    # # 定义要搜索的超参数网格
+    # param_grid = {
+    #     'n_estimators': [50, 100, 200],
+    #     'max_depth': [2, 4, 6],
+    #     'learning_rate': [0.01, 0.1, 0.2],
+    #     'objective': ['reg:squarederror']
+    # }
+    # grid_search = GridSearchCV(bst, param_grid, cv=5, scoring='neg_mean_squared_error')
+    # # 执行网格搜索
+    # grid_search.fit(X_train, y_train)
 
-    # 执行网格搜索
-    grid_search.fit(X_train, y_train)
+    # # 输出最佳参数
+    # print(grid_search.best_params_)
 
-    # 输出最佳参数
-    print(grid_search.best_params_)
+    # set the best parameters
+    bst = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1, objective='reg:squarederror')
+
     # fit model
     bst.fit(X_train, y_train)
+    print(bst)
     
     # save model
     bst.save_model(f"{save_dir}/model_best.json")
 
     # make predictions
     preds = bst.predict(X_test)
+
+    ic = np.corrcoef(preds, y_test)[0, 1]
+    print(f"IC: {ic}")
 
     plt.scatter(y_test, preds)
     plt.xlabel("y_test")
@@ -534,6 +553,8 @@ def train_xgboost_regressor():
 def demo_of_load_xgboost_model():
     save_dir = "model/MLP_indicator"
     model_path = f"{save_dir}/model_best.json"
+    future_days = 30
+    pre_days = 10
     bst = XGBRegressor()
     bst.load_model(model_path)
 
@@ -544,7 +565,7 @@ def demo_of_load_xgboost_model():
         for line in f:
             test_files.append(line.strip())
 
-    test_dataset = IndictorDataset(test_files, future_days=30, one_hot_flag=False)
+    test_dataset = IndictorDataset(test_files, future_days=future_days, pre_days=pre_days, one_hot_flag=False)
     X_test, y_test = test_dataset.get_data_and_label()
     preds = bst.predict(X_test)
 
@@ -757,8 +778,8 @@ def demo_of_random_forest():
 
     # save model
     
-    joblib.dump(clf, f"{save_dir}/knn_model_best.pkl")
-    print(f"model saved to {save_dir}/knn_model_best.pkl")
+    joblib.dump(clf, f"{save_dir}/random_forest_best.pkl")
+    print(f"model saved to {save_dir}/random_forest_best.pkl")
     
     y_pred = clf.predict(X_test)
 
@@ -789,11 +810,11 @@ if __name__ == "__main__":
     # test_MLP_indicator()
     # train_xgboost_classifier()
     # train_xgboost_regressor()
-    # demo_of_load_xgboost_model()
+    demo_of_load_xgboost_model()
     # demo_of_xgboost_feature()
     # demo_of_train_svm()
     # demo_of_KNN()
-    demo_of_random_forest()
+    # demo_of_random_forest()
 
 
 

@@ -36,8 +36,8 @@ class DataIndicator():
         print(f"close: {close}")
 
         indicators = {}
-        indicators["MA5"] = ta.MA(data[close], timeperiod=5)
-        indicators["MA30"] = ta.MA(data[close], timeperiod=30)
+        # indicators["MA5"] = ta.MA(data[close], timeperiod=5)
+        # indicators["MA30"] = ta.MA(data[close], timeperiod=30)
 
         # RSI
         indicators["RSI"] = ta.RSI(data[close], timeperiod=14)
@@ -68,7 +68,7 @@ class DataIndicator():
         return indicators
     
 class IndictorDataset(Dataset):
-    def __init__(self, csv_files, future_days=10, one_hot_flag=False) -> None:
+    def __init__(self, csv_files, future_days=10, pre_days=1, one_hot_flag=False) -> None:
         super().__init__()
         self.data = []
         self.indicator = []
@@ -88,10 +88,10 @@ class IndictorDataset(Dataset):
             close_key = 'close'
             if "Close" in data.columns:
                 close_key = "Close"
-            assert len(data[close_key]) == len(indicators["MA5"])
+            assert len(data[close_key]) == len(indicators["RSI"])
 
             start_index = 0
-            length = len(indicators["MA5"])
+            length = len(indicators["RSI"])
             for index in range(0, length):
                 for key in indicators:
                     if np.isnan(indicators[key][index]) :
@@ -101,18 +101,19 @@ class IndictorDataset(Dataset):
             for key in indicators:
                 indicators[key] = indicators[key][start_index:]
             
-            if len(indicators["MA5"]) < future_days + start_index:
+            if len(indicators["RSI"]) < future_days + start_index:
                 continue
 
             # normalize the data
-            indicators["MA5"] = (indicators["MA5"] ) / indicators["MA5"][start_index]
-            indicators["MA30"] = (indicators["MA30"] ) / indicators["MA30"][start_index]
+            # indicators["MA5"] = (indicators["MA5"] ) / indicators["MA5"][start_index]
+            # indicators["MA30"] = (indicators["MA30"] ) / indicators["MA30"][start_index]
             indicators["OBV"] = (indicators["OBV"] - indicators["OBV"][start_index]) / indicators["OBV"][start_index]
 
-            for i in range(start_index, length - future_days):
+            for i in range(start_index+pre_days, length - future_days - 2):
                 x_i = []
                 for key in indicators:
-                    x_i.append(indicators[key][i])
+                    x_i.extend(indicators[key][i-pre_days:i-1])
+                # print(f"x_i shape: {np.array(x_i).shape}")
                 y_i = (data[close_key][i+future_days] - data[close_key][i]) / data[close_key][i]
                 if np.isnan(y_i) or np.isinf(y_i):
                     continue
@@ -134,6 +135,8 @@ class IndictorDataset(Dataset):
             print(f"{i} / {key}")
         self.data = np.array(self.data, dtype=np.float32)
         self.label = np.array(self.label, dtype=np.float32)
+        print(f"data shape: {self.data.shape}")
+        print(f"label shape: {self.label.shape}")
 
     def get_data_and_label(self):
         return self.data, self.label

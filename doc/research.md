@@ -284,3 +284,35 @@ IC: 0.2734895863124457
 as the result, the xgboost regressor can predict the future 30 days return with a IC of 0.2735, which is a good result.But it isn ot a good for A stock market.
 ![xgboost](images/sp500_xgboost_regressor_feature_importance.jpg)
 
+## 6 xgboost regression with previous 10 days indicators
+```
+0 / RSI
+1 / CCI
+2 / slowk
+3 / slowd
+4 / ADX
+5 / MOM
+6 / OBV
+7 / macd
+8 / signal
+9 / hist
+10 / ATR
+11 / ROC
+data shape: (103206, 108)
+label shape: (103206,)
+XGBRegressor(base_score=None, booster=None, callbacks=None,
+             colsample_bylevel=None, colsample_bynode=None,
+             colsample_bytree=None, device=None, early_stopping_rounds=None,
+             enable_categorical=False, eval_metric=None, feature_types=None,
+             gamma=None, grow_policy=None, importance_type=None,
+             interaction_constraints=None, learning_rate=0.1, max_bin=None,
+             max_cat_threshold=None, max_cat_to_onehot=None,
+             max_delta_step=None, max_depth=6, max_leaves=None,
+             min_child_weight=None, missing=nan, monotone_constraints=None,
+             multi_strategy=None, n_estimators=200, n_jobs=None,
+             num_parallel_tree=None, random_state=None, ...)
+IC: 0.937778172586351
+```
+![xgboost](images/sp500_xgboost_regressor_pre10days.jpg)
+
+Absolutely crazy, the xgboost regressor with previous 10 days indicators can predict the future 30 days return with a IC of 0.9378, which is a very good result.
