@@ -1251,14 +1251,8 @@ class XGBoostStrategy(StragegyTemplate):
     params = (
         ('rsi_period',14),
         ('cci_period',14),
-        ('fastk_period',5),
-        ('slowk_period',3),
-        ('slowd_period',3),
         ('adx_period',14),
         ('mom_period',10),
-        ('macd_fast_period',12),
-        ('macd_slow_period',26),
-        ('macd_signal_period',9),
         ('atr_period',14),
         ('roc_period',10),
         ('min_start_index', 60),
@@ -1337,19 +1331,19 @@ class XGBoostStrategy(StragegyTemplate):
         x_i = []
         
         for key in self.indictors_list[0]:
-            if key == "OBV":
-                x = []
-                for i in range(self.pre_days):
-                    normal_obv = (self.indictors_list[data_index][key][time_index-self.pre_days+i] - self.first_obv[data_index]) / self.first_obv[data_index]
-                    x.append(normal_obv)
+            # if key == "OBV":
+            #     x = []
+            #     for i in range(self.pre_days):
+            #         normal_obv = (self.indictors_list[data_index][key][time_index-self.pre_days+i] - self.first_obv[data_index]) / self.first_obv[data_index]
+            #         x.append(normal_obv)
                 
-                x_i.extend(x)
-            else:
-                # it does not support the clice operation
-                x = []
-                for i in range(self.pre_days):
-                    x.append(self.indictors_list[data_index][key][time_index-self.pre_days+i])
-                x_i.extend(x)
+            #     x_i.extend(x)
+            # else:
+            #     # it does not support the clice operation
+            x = []
+            for i in range(self.pre_days):
+                x.append(self.indictors_list[data_index][key][time_index-self.pre_days+i])
+            x_i.extend(x)
 
         if np.isnan(x_i).any() or np.isinf(x_i).any():
             return None
@@ -1372,18 +1366,18 @@ class XGBoostStrategy(StragegyTemplate):
             x_i = self.get_predays_indictor(i, 0)
             if x_i is None:
                 continue
-            x_i = np.array(x_i).reshape(1, -1)
+            x_i = np.array([x_i])
             # print(f"x_i shae: {x_i.shape}")
             y_i = self.bst.predict(x_i)
 
             # print(f"x_i: \n {x_i}")
             # print(f"y_i_pred: \n {y_i}")
             if self.getposition(data).size <= 0:
-                if y_i[0] > 0.2:
+                if y_i[0] > 0.3:
                     self.order = self.buy(data)
             else:
                 hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
-                if hold_days >= 30 or y_i[0] < -0.1:
+                if hold_days >= 30 :
                     self.order = self.sell(data)
         
         self.query_holding_number()

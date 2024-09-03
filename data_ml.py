@@ -86,14 +86,14 @@ class IndictorDataset(Dataset):
             if not os.path.isfile(file):
                 logger.info(f"{file} is not a file")
                 continue
-            logger.info(f'{i} processing {file}')
+            # logger.info(f'{i} processing {file}')
             indicators = self.data_indicator.get_indicator(file)
             data = pd.read_csv(file)
 
             close_key = 'close'
             if "Close" in data.columns:
                 close_key = "Close"
-            assert len(data[close_key]) == len(indicators["RSI"])
+            assert len(data[close_key]) == len(indicators["RSI"]), f"close length: {len(data[close_key])} != RSI length: {len(indicators['RSI'])}"
 
             start_index = 0
             length = len(indicators["RSI"])
@@ -114,7 +114,7 @@ class IndictorDataset(Dataset):
             # normalize the data
             # indicators["MA5"] = (indicators["MA5"] ) / indicators["MA5"][start_index]
             # indicators["MA30"] = (indicators["MA30"] ) / indicators["MA30"][start_index]
-            indicators["OBV"] = (indicators["OBV"] - indicators["OBV"][start_index]) / indicators["OBV"][start_index]
+            # indicators["OBV"] = (indicators["OBV"] - indicators["OBV"][start_index]) / indicators["OBV"][start_index]
 
             feature_dim = len(indicators) * (pre_days - 1)
             for i in range(start_index+pre_days+1, length - future_days - 2):
@@ -249,7 +249,7 @@ class MLDataset(Dataset):
             if not os.path.isfile(file):
                 logger.info(f"{file} is not a file")
                 continue
-            logger.info(f'{i} processing {file}')
+            # logger.info(f'{i} processing {file}')
             X,Y = self.ml_data_tool.get_shift_data(file)
             self.data.extend(X)
             if use_signal_future_day:
