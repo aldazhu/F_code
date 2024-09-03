@@ -75,6 +75,11 @@ class IndictorDataset(Dataset):
         self.data_indicator = DataIndicator()
         self.data = []
         self.label = []
+
+        if len(csv_files) == 0:
+            logger.info("No csv files")
+            return
+
         for i, file in enumerate(csv_files):
             if not file.endswith(".csv"):
                 continue
@@ -97,6 +102,8 @@ class IndictorDataset(Dataset):
                     if np.isnan(indicators[key][index]) :
                         start_index += 1
                         break
+            if start_index == 0:
+                continue
             print(f"start_index: {start_index}")
             for key in indicators:
                 indicators[key] = indicators[key][start_index:]
@@ -109,7 +116,8 @@ class IndictorDataset(Dataset):
             # indicators["MA30"] = (indicators["MA30"] ) / indicators["MA30"][start_index]
             indicators["OBV"] = (indicators["OBV"] - indicators["OBV"][start_index]) / indicators["OBV"][start_index]
 
-            for i in range(start_index+pre_days, length - future_days - 2):
+            feature_dim = len(indicators) * (pre_days - 1)
+            for i in range(start_index+pre_days+1, length - future_days - 2):
                 x_i = []
                 for key in indicators:
                     x_i.extend(indicators[key][i-pre_days:i-1])
@@ -129,8 +137,14 @@ class IndictorDataset(Dataset):
                         one_hot[1] = 1
                     y_i = one_hot
 
+                # print(f"x_i shape: {np.array(x_i).shape}")
+                if len(x_i) != feature_dim:
+                    print(f"feature dim: {feature_dim} != x_i dim: {len(x_i)}")
+                    continue
+
                 self.data.append(x_i)
                 self.label.append(y_i)
+        
         for i, key in enumerate(indicators):
             print(f"{i} / {key}")
         self.data = np.array(self.data, dtype=np.float32)

@@ -55,7 +55,7 @@ class MySeaData(btfeeds.GenericCSVData):
         ('high', 2),
         ('low', 3),
         ('close', 4),
-        ('volume', -1),
+        ('volume', 6),
         # ('openinterest', -1)
     )
 

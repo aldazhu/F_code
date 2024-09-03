@@ -18,10 +18,13 @@ import random
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import datetime
 
 from data_ml import MLDataset, IndictorDataset
 
 from ml_model import TemporalConvNet, MyTemporalConvNet, MLP
+
+from test_backtrader import get_valid_files
 
 
 # class TemporalConvNet(nn.Module):
@@ -491,14 +494,29 @@ def train_xgboost_regressor():
     
     future_days = 30
     pre_days = 10
-    data_root = "data"
+    data_root = "data_train"
+    test_data_root = "data_test"
     one_hot = False
     
+    train_start_date = "2018-01-08"
+    train_end_date = "2022-01-01"
+    test_start_date = "2022-01-04"
+    test_end_date = "2024-08-01"
+
+    train_start_date = datetime.datetime.strptime(train_start_date, "%Y-%m-%d")
+    train_end_date = datetime.datetime.strptime(train_end_date, "%Y-%m-%d")
+    test_start_date = datetime.datetime.strptime(test_start_date, "%Y-%m-%d")
+    test_end_date = datetime.datetime.strptime(test_end_date, "%Y-%m-%d")
+
     train_ratio = 0.8
 
-    csv_files = [os.path.join(data_root, item) for item in os.listdir(data_root)]
-    train_files = random.sample(csv_files, int(len(csv_files) * train_ratio))
-    test_files = [file for file in csv_files if file not in train_files]
+    # csv_files = [os.path.join(data_root, item) for item in os.listdir(data_root)]
+    # train_files = random.sample(csv_files, int(len(csv_files) * train_ratio))
+    # test_files = [file for file in csv_files if file not in train_files]
+    
+    train_files = get_valid_files(data_root, train_start_date, train_end_date)
+    test_files = get_valid_files(test_data_root, test_start_date, test_end_date)
+
     with open(f"{save_dir}/train_files.txt", "w") as f:
         for file in train_files:
             f.write(file + "\n")
@@ -870,8 +888,8 @@ if __name__ == "__main__":
     # train_MLP_indicator()
     # test_MLP_indicator()
     # train_xgboost_classifier()
-    # train_xgboost_regressor()
-    demo_of_load_xgboost_model()
+    train_xgboost_regressor()
+    # demo_of_load_xgboost_model()
     # demo_of_xgboost_feature()
     # demo_of_train_svm()
     # demo_of_KNN()
