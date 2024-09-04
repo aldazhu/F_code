@@ -130,7 +130,7 @@ def demo_of_ShortTermReversalEffectinStocks():
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    data_root = "data_us"
+    data_root = "data"
     test_all_data = True
     from_date = datetime.datetime(2020, 1, 5)
     to_date = datetime.datetime(2024, 3, 30)
@@ -173,11 +173,11 @@ def demo_of_simple_strategy():
 
     strategies = [
         # NewHighStrategy ,# ok
-        NewLowStrategy, # ok
+        # NewLowStrategy, # ok
         # MovingAverageStrategy, # ok
         # CombinedIndicatorStrategy, # ok
         # RSIStrategy, # ok
-        # CCIStrategy,  # ok
+        CCIStrategy,  # ok # stop loss is importance, left side trader, 
         # DoubleEmaStrategy, # ok
         # MACDTrendFollowingStrategy, # ok
         # BollingerBandsStrategy, # ok
@@ -185,10 +185,11 @@ def demo_of_simple_strategy():
         # PriceMomumentStrategy,
         # InvertPriceMomumentStrategy,
         # PriceMomumentStrategyForUS,
-        # EMATrendStrategy, 
+        # EMATrendStrategy, # good for long trend, right side trader 
     ]
 
     if visual_data_one_by_one:
+        random.shuffle(datas)
         for data in datas:
             print(f"Processing {data._name} ...")
             test_backtrader([data], strategies=strategies, cash=1000000.0, commission=0.001, stake=stake, visual_data=True)
