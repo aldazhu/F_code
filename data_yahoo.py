@@ -1,6 +1,7 @@
 import backtrader as bt
 import pandas as pd
 import datetime
+import os
 
 import yfinance as yf
 
@@ -33,8 +34,28 @@ def demo_of_download_sp500():
             data.to_csv(f"data_us/{ticker}.csv")
         except Exception as e:
             print(f"Error in downloading {ticker}, {e}")
+
+def demo_of_download_sp500_with_dict():
+    start_date = "2020-01-01"
+    end_date = "2024-07-01"
+    dict_path = "doc/sp500_info.txt"
+    save_dir = 'data_us'
+    os.makedirs(save_dir, exist_ok=True)
+    df = pd.read_csv(dict_path)
+    print(df.head())
+    print(df.tail())
+    tickers = df['Symbol'].tolist()
+    total_tickers = len(tickers)
+    for i, ticker in enumerate(tickers):
+        try:
+            print(f"Downloading {ticker}, {i}/{total_tickers}")
+            data = yf.download(ticker, start=start_date, end=end_date)
+            data.to_csv(f"{save_dir}/{ticker}.csv")
+        except Exception as e:
+            print(f"Error in downloading {ticker}, {e}")
         
 
 if __name__ == "__main__":
     # demo_of_download_data()
     demo_of_download_sp500()
+    # demo_of_download_sp500_with_dict()

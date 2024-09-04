@@ -27,7 +27,7 @@ def get_valid_files(data_root, start_date, end_date):
     print(f"Total valid files: {len(valid_files)}")
     return valid_files
 
-def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100):
+def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100, visual_data=False):
     # Create a cerebro entity
     cerebro = bt.Cerebro()
 
@@ -72,7 +72,8 @@ def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100
     profit = cerebro.broker.getvalue() - cash
 
     # Visulize the result
-    # cerebro.plot()
+    if visual_data:
+        cerebro.plot()
 
     return profit
 
@@ -134,6 +135,8 @@ def demo_of_simple_strategy():
     from_date = datetime.datetime(2020, 1, 5)
     to_date = datetime.datetime(2024, 3, 30)
 
+    visual_data_one_by_one = True
+
     data_names = [
         f'{data_root}/sz.300628.csv',
         f'{data_root}/sz.300979.csv',
@@ -169,8 +172,8 @@ def demo_of_simple_strategy():
     stake = 1
 
     strategies = [
-        NewHighStrategy ,# ok
-        # NewLowStrategy, # ok
+        # NewHighStrategy ,# ok
+        NewLowStrategy, # ok
         # MovingAverageStrategy, # ok
         # CombinedIndicatorStrategy, # ok
         # RSIStrategy, # ok
@@ -185,7 +188,12 @@ def demo_of_simple_strategy():
         # EMATrendStrategy, 
     ]
 
-    test_backtrader(datas, strategies=strategies, cash=1000000.0, commission=0.001, stake=stake)
+    if visual_data_one_by_one:
+        for data in datas:
+            print(f"Processing {data._name} ...")
+            test_backtrader([data], strategies=strategies, cash=1000000.0, commission=0.001, stake=stake, visual_data=True)
+    else:
+        test_backtrader(datas, strategies=strategies, cash=1000000.0, commission=0.001, stake=stake)
 
 
 def demo_of_multiple_data():
