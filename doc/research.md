@@ -256,3 +256,31 @@ Sharpe Ratio: OrderedDict([('sharperatio', -0.1501450230052196)])
 max Draw Down: AutoOrderedDict([('len', 236), ('drawdown', 0.07299242761019854), ('moneydown', 730.3122297455557)])
 return: -0.005045798765825489
 ```
+
+## 6. xgboost regression
+```
+0 / MA5
+1 / MA30
+2 / RSI
+3 / CCI
+4 / slowk
+5 / slowd
+6 / ADX
+7 / MOM
+8 / OBV
+9 / macd
+10 / signal
+11 / hist
+12 / ATR
+13 / ROC
+use indictors:['ma5','ma30','rsi','cci','obv',....]
+
+future 30 days reutrn as target
+```
+![xgboost](images/sp500_xgboost_regressor.jpg)
+
+IC: 0.2734895863124457
+
+as the result, the xgboost regressor can predict the future 30 days return with a IC of 0.2735, which is a good result.But it isn ot a good for A stock market.
+![xgboost](images/sp500_xgboost_regressor_feature_importance.jpg)
+

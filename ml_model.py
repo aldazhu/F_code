@@ -86,8 +86,9 @@ class MyTemporalConvNet(nn.Module):
         return self.fc(x)
     
 class MLP(nn.Module):
-    def __init__(self, input_features, pre_days, hidden_dim, output_dim):
+    def __init__(self, input_features, pre_days, hidden_dim, output_dim, classfication=False):
         super(MLP, self).__init__()
+        self.classfication = classfication
         self.flatten = nn.Flatten()
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(input_features*pre_days, hidden_dim),
@@ -96,6 +97,8 @@ class MLP(nn.Module):
             nn.LeakyReLU(),
             nn.Linear(hidden_dim, output_dim),
         )
+        if self.classfication:
+            self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         x = self.flatten(x)
@@ -105,6 +108,9 @@ class MLP(nn.Module):
         # print(f"logits shape: {logits.shape}")
         # print(f"logits: {logits}")
         # input("press any key to continue")
+        if self.classfication:
+            return self.softmax(logits)
+        
         return logits
     
 def demo_of_MLP_model():

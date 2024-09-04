@@ -31,9 +31,9 @@ def demo_of_tsne_plot_indicators():
             labels.append(label)
         indicators = np.array(indicators)
         labels = np.array(labels)
-        labels = np.where(labels > 0.03, 1, labels)
-        labels = np.where(labels < -0.03, -1, labels)
-        labels = np.where(abs(labels) <= 0.3, 0, labels)
+        labels = np.where(labels > 0.05, 1, labels)
+        labels = np.where(labels < -0.05, -1, labels)
+        labels = np.where(abs(labels) <= 0.05, 0, labels)
         labels = labels.astype(int)
         print(indicators.shape)
         print(labels.shape)
@@ -70,8 +70,41 @@ def demo_of_tsne_predays_OHLCV():
         tsne_plot_indicators(datas, labels)
             
             
+def demo_of_top_indicators():
+    csv_root = 'mini_data'
+    csv_files = [os.path.join(csv_root, item) for item in os.listdir(csv_root)]
+
+    test_dataset = IndictorDataset(csv_files, future_days=30, one_hot_flag=False)
+    X_test, y_test = test_dataset.get_data_and_label()
+    print(f"X_test shape: {X_test.shape}")
+    print(f"y_test shape: {y_test.shape}")
+
+    X_top = []
+    y_top = []
+    for i in range(len(X_test)):
+        if y_test[i] >  0.03:
+            X_top.append(X_test[i])
+            y_top.append(y_test[i])
+        elif y_test[i] < -0.03:
+            X_top.append(X_test[i])
+            y_top.append(y_test[i])
+
+    X_top = np.array(X_top)
+    y_top = np.array(y_top)
+    X_top = X_top[:, [13]]
+    print(f"X_top shape: {X_top.shape}")
+    print(f"y_top shape: {y_top.shape}")
+
+    print(X_top[:10])
+    print(y_top[:10])
+    plt.scatter(X_top, y_top)
+
+    plt.ylabel('label')
+    plt.xlabel('indicator')
+    plt.show()
         
 
 if __name__ == '__main__':
     # demo_of_tsne_plot_indicators()
-    demo_of_tsne_predays_OHLCV()
+    # demo_of_tsne_predays_OHLCV()
+    demo_of_top_indicators()

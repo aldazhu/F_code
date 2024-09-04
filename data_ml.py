@@ -15,40 +15,60 @@ class DataIndicator():
 
     def get_indicator(self, file_path):
         data = pd.read_csv(file_path)
+        #  get column names
+        data_columns = data.columns
+        print(data_columns)
+
+        
+        close = 'close'
+        open = 'open'
+        high = 'high'
+        low = 'low'
+        volume = 'volume'
+        
+        if "Close" in data_columns:
+            close = 'Close'
+            open = 'Open'
+            high = 'High'
+            low = 'Low'
+            volume = 'Volume'
+        
+        print(f"close: {close}")
+
         indicators = {}
-        indicators["MA5"] = ta.MA(data["close"], timeperiod=5)
-        indicators["MA30"] = ta.MA(data["close"], timeperiod=30)
+        indicators["MA5"] = ta.MA(data[close], timeperiod=5)
+        indicators["MA30"] = ta.MA(data[close], timeperiod=30)
 
         # RSI
-        indicators["RSI"] = ta.RSI(data["close"], timeperiod=14)
+        indicators["RSI"] = ta.RSI(data[close], timeperiod=14)
 
         # CCI
-        indicators["CCI"] = ta.CCI(data["high"], data["low"], data["close"], timeperiod=14)
+        indicators["CCI"] = ta.CCI(data[high], data[low], data[close], timeperiod=14)
 
         # Stochastic Oscillator
-        indicators["slowk"], indicators["slowd"] = ta.STOCH(data["high"], data["low"], data["close"], fastk_period=5, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)
+        indicators["slowk"], indicators["slowd"] = ta.STOCH(data[high], data[low], data[close], fastk_period=5, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)
 
         # ADX
-        indicators["ADX"] = ta.ADX(data["high"], data["low"], data["close"], timeperiod=14)
+        indicators["ADX"] = ta.ADX(data[high], data[low], data[close], timeperiod=14)
 
         # Momentum
-        indicators["MOM"] = ta.MOM(data["close"], timeperiod=10)
+        indicators["MOM"] = ta.MOM(data[close], timeperiod=10)
 
-        indicators["OBV"] = ta.OBV(data["close"], data["volume"])
+        indicators["OBV"] = ta.OBV(data[close], data[volume])
 
         # MACD
-        indicators["macd"], indicators["signal"], indicators["hist"] = ta.MACD(data["close"], fastperiod=12, slowperiod=26, signalperiod=9)
+        indicators["macd"], indicators["signal"], indicators["hist"] = ta.MACD(data[close], fastperiod=12, slowperiod=26, signalperiod=9)
 
         # ATR
-        indicators["ATR"] = ta.ATR(data["high"], data["low"], data["close"], timeperiod=14)
+        indicators["ATR"] = ta.ATR(data[high], data[low], data[close], timeperiod=14)
 
         # ROC
-        indicators["ROC"] = ta.ROC(data["close"], timeperiod=10)
+        indicators["ROC"] = ta.ROC(data[close], timeperiod=10)
         
         return indicators
     
 class IndictorDataset(Dataset):
-    def __init__(self, csv_files, future_days=10) -> None:
+    def __init__(self, csv_files, future_days=10, one_hot_flag=False) -> None:
         super().__init__()
         self.data = []
         self.indicator = []
@@ -64,7 +84,11 @@ class IndictorDataset(Dataset):
             logger.info(f'{i} processing {file}')
             indicators = self.data_indicator.get_indicator(file)
             data = pd.read_csv(file)
-            assert len(data["close"]) == len(indicators["MA5"])
+
+            close_key = 'close'
+            if "Close" in data.columns:
+                close_key = "Close"
+            assert len(data[close_key]) == len(indicators["MA5"])
 
             start_index = 0
             length = len(indicators["MA5"])
@@ -76,6 +100,9 @@ class IndictorDataset(Dataset):
             print(f"start_index: {start_index}")
             for key in indicators:
                 indicators[key] = indicators[key][start_index:]
+            
+            if len(indicators["MA5"]) < future_days + start_index:
+                continue
 
             # normalize the data
             indicators["MA5"] = (indicators["MA5"] ) / indicators["MA5"][start_index]
@@ -86,15 +113,30 @@ class IndictorDataset(Dataset):
                 x_i = []
                 for key in indicators:
                     x_i.append(indicators[key][i])
-                y_i = (data["close"][i+future_days] - data["close"][i]) / data["close"][i]
+                y_i = (data[close_key][i+future_days] - data[close_key][i]) / data[close_key][i]
                 if np.isnan(y_i) or np.isinf(y_i):
                     continue
                 if np.isnan(x_i).any() or np.isinf(x_i).any():
                     continue
+                if one_hot_flag:
+                    one_hot = np.zeros(3)
+                    if y_i > 0.03:
+                        one_hot[2] = 1
+                    elif y_i < -0.03:
+                        one_hot[0] = 1
+                    else:
+                        one_hot[1] = 1
+                    y_i = one_hot
+
                 self.data.append(x_i)
                 self.label.append(y_i)
+        for i, key in enumerate(indicators):
+            print(f"{i} / {key}")
         self.data = np.array(self.data, dtype=np.float32)
         self.label = np.array(self.label, dtype=np.float32)
+
+    def get_data_and_label(self):
+        return self.data, self.label
 
     def __len__(self):
         return len(self.data)
