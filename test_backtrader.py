@@ -135,7 +135,7 @@ def demo_of_simple_strategy():
     from_date = datetime.datetime(2020, 1, 5)
     to_date = datetime.datetime(2024, 3, 30)
 
-    visual_data_one_by_one = True
+    visual_data_one_by_one = False
 
     data_names = [
         f'{data_root}/sz.300628.csv',
