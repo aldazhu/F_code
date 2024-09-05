@@ -36,8 +36,8 @@ class DataIndicator():
         print(f"close: {close}")
 
         indicators = {}
-        indicators["MA5"] = ta.MA(data[close], timeperiod=5)
-        indicators["MA30"] = ta.MA(data[close], timeperiod=30)
+        # indicators["MA5"] = ta.MA(data[close], timeperiod=5)
+        # indicators["MA30"] = ta.MA(data[close], timeperiod=30)
 
         # RSI
         indicators["RSI"] = ta.RSI(data[close], timeperiod=14)
@@ -68,51 +68,60 @@ class DataIndicator():
         return indicators
     
 class IndictorDataset(Dataset):
-    def __init__(self, csv_files, future_days=10, one_hot_flag=False) -> None:
+    def __init__(self, csv_files, future_days=10, pre_days=1, one_hot_flag=False) -> None:
         super().__init__()
         self.data = []
         self.indicator = []
         self.data_indicator = DataIndicator()
         self.data = []
         self.label = []
+
+        if len(csv_files) == 0:
+            logger.info("No csv files")
+            return
+
         for i, file in enumerate(csv_files):
             if not file.endswith(".csv"):
                 continue
             if not os.path.isfile(file):
                 logger.info(f"{file} is not a file")
                 continue
-            logger.info(f'{i} processing {file}')
+            # logger.info(f'{i} processing {file}')
             indicators = self.data_indicator.get_indicator(file)
             data = pd.read_csv(file)
 
             close_key = 'close'
             if "Close" in data.columns:
                 close_key = "Close"
-            assert len(data[close_key]) == len(indicators["MA5"])
+            assert len(data[close_key]) == len(indicators["RSI"]), f"close length: {len(data[close_key])} != RSI length: {len(indicators['RSI'])}"
 
             start_index = 0
-            length = len(indicators["MA5"])
+            length = len(indicators["RSI"])
             for index in range(0, length):
                 for key in indicators:
                     if np.isnan(indicators[key][index]) :
                         start_index += 1
                         break
+            if start_index == 0:
+                continue
             print(f"start_index: {start_index}")
             for key in indicators:
                 indicators[key] = indicators[key][start_index:]
             
-            if len(indicators["MA5"]) < future_days + start_index:
+            if len(indicators["RSI"]) < future_days + start_index:
                 continue
 
             # normalize the data
-            indicators["MA5"] = (indicators["MA5"] ) / indicators["MA5"][start_index]
-            indicators["MA30"] = (indicators["MA30"] ) / indicators["MA30"][start_index]
-            indicators["OBV"] = (indicators["OBV"] - indicators["OBV"][start_index]) / indicators["OBV"][start_index]
+            # indicators["MA5"] = (indicators["MA5"] ) / indicators["MA5"][start_index]
+            # indicators["MA30"] = (indicators["MA30"] ) / indicators["MA30"][start_index]
+            # indicators["OBV"] = (indicators["OBV"] - indicators["OBV"][start_index]) / indicators["OBV"][start_index]
 
-            for i in range(start_index, length - future_days):
+            feature_dim = len(indicators) * (pre_days - 1)
+            for i in range(start_index+pre_days+1, length - future_days - 2):
                 x_i = []
                 for key in indicators:
-                    x_i.append(indicators[key][i])
+                    x_i.extend(indicators[key][i-pre_days:i-1])
+                # print(f"x_i shape: {np.array(x_i).shape}")
                 y_i = (data[close_key][i+future_days] - data[close_key][i]) / data[close_key][i]
                 if np.isnan(y_i) or np.isinf(y_i):
                     continue
@@ -128,12 +137,20 @@ class IndictorDataset(Dataset):
                         one_hot[1] = 1
                     y_i = one_hot
 
+                # print(f"x_i shape: {np.array(x_i).shape}")
+                if len(x_i) != feature_dim:
+                    print(f"feature dim: {feature_dim} != x_i dim: {len(x_i)}")
+                    continue
+
                 self.data.append(x_i)
                 self.label.append(y_i)
+        
         for i, key in enumerate(indicators):
             print(f"{i} / {key}")
         self.data = np.array(self.data, dtype=np.float32)
         self.label = np.array(self.label, dtype=np.float32)
+        print(f"data shape: {self.data.shape}")
+        print(f"label shape: {self.label.shape}")
 
     def get_data_and_label(self):
         return self.data, self.label
@@ -232,7 +249,7 @@ class MLDataset(Dataset):
             if not os.path.isfile(file):
                 logger.info(f"{file} is not a file")
                 continue
-            logger.info(f'{i} processing {file}')
+            # logger.info(f'{i} processing {file}')
             X,Y = self.ml_data_tool.get_shift_data(file)
             self.data.extend(X)
             if use_signal_future_day:

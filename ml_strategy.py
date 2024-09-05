@@ -10,7 +10,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn import svm
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 import joblib
 
@@ -18,10 +18,13 @@ import random
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import datetime
 
 from data_ml import MLDataset, IndictorDataset
 
 from ml_model import TemporalConvNet, MyTemporalConvNet, MLP
+
+from test_backtrader import get_valid_files
 
 
 # class TemporalConvNet(nn.Module):
@@ -328,10 +331,10 @@ def train_MLP_indicator():
     writer = SummaryWriter(save_dir)
     num_epochs = 100
     batch_size = 128
-    pre_days = 1
-    future_days = 10
+    pre_days = 10
+    future_days = 30
     data_root = "data"
-    one_hot = True
+    one_hot = False
     classfication = False
     
     train_ratio = 0.8
@@ -351,8 +354,8 @@ def train_MLP_indicator():
         for file in test_files:
             f.write(file + "\n")
 
-    train_dataset = IndictorDataset(train_files, future_days=future_days,one_hot_flag=one_hot)
-    test_dataset = IndictorDataset(test_files, future_days=future_days, one_hot_flag=one_hot)
+    train_dataset = IndictorDataset(train_files, future_days=future_days, pre_days=pre_days, one_hot_flag=one_hot)
+    test_dataset = IndictorDataset(test_files, future_days=future_days, pre_days=pre_days, one_hot_flag=one_hot)
 
     # get data shape
     input_data, target = train_dataset[0]
@@ -361,8 +364,11 @@ def train_MLP_indicator():
     print(f"target: {target}")
     input_shape = input_data.shape
     target_shape = target.shape
-    output_dim = target_shape[0] 
-    mlp = MLP(input_shape[0], pre_days, hidden_dim, output_dim,classfication=classfication)
+    if one_hot:
+        output_dim = target_shape[0] 
+    else:
+        output_dim = 1
+    mlp = MLP(input_shape[0], 1, hidden_dim, output_dim,classfication=classfication)
     print(f"device: {device}")
     print(mlp)
     print(f"parameters: {sum(p.numel() for p in mlp.parameters())}")
@@ -447,7 +453,7 @@ def train_xgboost_classifier():
     X_test, y_test = test_dataset.get_data_and_label()
     # create model instance
     bst = XGBClassifier()
-    bst = XGBRegressor()
+    # bst = XGBRegressor()
     # 定义要搜索的超参数网格
     param_grid = {
         'n_estimators': [50, 100, 200],
@@ -466,6 +472,17 @@ def train_xgboost_classifier():
     bst.fit(X_train, y_train)
     # make predictions
     preds = bst.predict(X_test)
+    ic = np.corrcoef(preds, y_test)[0, 1]
+    print(f"IC: {ic}")
+
+    accuracy = accuracy_score(y_test, preds)
+    print(f"accuracy: {accuracy}")
+
+    confusion_matrix_result = confusion_matrix(y_test, preds)
+    print(f"confusion_matrix: \n {confusion_matrix_result}")
+
+    print('Classification Report')
+    print(classification_report(y_test, preds))
 
     for i in range(len(preds)):
         print(f"y_test: {y_test[i]}")
@@ -473,17 +490,33 @@ def train_xgboost_classifier():
         input("press any key to continue")
 
 def train_xgboost_regressor():
-    save_dir = "model/MLP_indicator"
+    save_dir = "model/xgboost"
     
     future_days = 30
-    data_root = "data_us"
+    pre_days = 10
+    data_root = "data_train"
+    test_data_root = "data_test"
     one_hot = False
     
+    train_start_date = "2018-01-08"
+    train_end_date = "2022-01-01"
+    test_start_date = "2022-01-04"
+    test_end_date = "2024-08-01"
+
+    train_start_date = datetime.datetime.strptime(train_start_date, "%Y-%m-%d")
+    train_end_date = datetime.datetime.strptime(train_end_date, "%Y-%m-%d")
+    test_start_date = datetime.datetime.strptime(test_start_date, "%Y-%m-%d")
+    test_end_date = datetime.datetime.strptime(test_end_date, "%Y-%m-%d")
+
     train_ratio = 0.8
 
-    csv_files = [os.path.join(data_root, item) for item in os.listdir(data_root)]
-    train_files = random.sample(csv_files, int(len(csv_files) * train_ratio))
-    test_files = [file for file in csv_files if file not in train_files]
+    # csv_files = [os.path.join(data_root, item) for item in os.listdir(data_root)]
+    # train_files = random.sample(csv_files, int(len(csv_files) * train_ratio))
+    # test_files = [file for file in csv_files if file not in train_files]
+    
+    train_files = get_valid_files(data_root, train_start_date, train_end_date)
+    test_files = get_valid_files(test_data_root, test_start_date, test_end_date)
+
     with open(f"{save_dir}/train_files.txt", "w") as f:
         for file in train_files:
             f.write(file + "\n")
@@ -491,35 +524,48 @@ def train_xgboost_regressor():
         for file in test_files:
             f.write(file + "\n")
 
-    train_dataset = IndictorDataset(train_files, future_days=future_days,one_hot_flag=one_hot)
-    test_dataset = IndictorDataset(test_files, future_days=future_days, one_hot_flag=one_hot)
+    train_dataset = IndictorDataset(train_files, future_days=future_days,pre_days=pre_days ,one_hot_flag=one_hot)
+    test_dataset = IndictorDataset(test_files, future_days=future_days, pre_days=pre_days ,one_hot_flag=one_hot)
 
     X_train, y_train = train_dataset.get_data_and_label()
     X_test, y_test = test_dataset.get_data_and_label()
-    # create model instance
-    bst = XGBRegressor()
-    # 定义要搜索的超参数网格
-    param_grid = {
-        'n_estimators': [50, 100, 200],
-        'max_depth': [2, 4, 6],
-        'learning_rate': [0.01, 0.1, 0.2],
-        'objective': ['reg:squarederror']
-    }
-    grid_search = GridSearchCV(bst, param_grid, cv=5, scoring='neg_mean_squared_error')
 
-    # 执行网格搜索
-    grid_search.fit(X_train, y_train)
+    # X_train = np.load("model/xgboost/train_data.npy")
+    # y_train = np.load("model/xgboost/train_label.npy")
 
-    # 输出最佳参数
-    print(grid_search.best_params_)
+    # X_test = np.load("model/xgboost/test_data.npy")
+    # y_test = np.load("model/xgboost/test_label.npy")
+    # # create model instance
+    # bst = XGBRegressor()
+    # # 定义要搜索的超参数网格
+    # param_grid = {
+    #     'n_estimators': [50, 100, 200],
+    #     'max_depth': [2, 4, 6],
+    #     'learning_rate': [0.01, 0.1, 0.2],
+    #     'objective': ['reg:squarederror']
+    # }
+    # grid_search = GridSearchCV(bst, param_grid, cv=5, scoring='neg_mean_squared_error')
+    # # 执行网格搜索
+    # grid_search.fit(X_train, y_train)
+
+    # # 输出最佳参数
+    # print(grid_search.best_params_)
+
+    # set the best parameters
+    bst = XGBRegressor(n_estimators=150, max_depth=4, learning_rate=0.1, objective='reg:squarederror')
+
     # fit model
     bst.fit(X_train, y_train)
+    print(bst)
     
     # save model
-    bst.save_model(f"{save_dir}/model_best.json")
+    bst.save_model(f"{save_dir}/xgboost_model_regressor.json")
 
     # make predictions
     preds = bst.predict(X_test)
+
+    ic = np.corrcoef(preds, y_test)[0, 1]
+    print(f"IC: {ic}")
 
     plt.scatter(y_test, preds)
     plt.xlabel("y_test")
@@ -532,8 +578,10 @@ def train_xgboost_regressor():
         input("press any key to continue")
 
 def demo_of_load_xgboost_model():
-    save_dir = "model/MLP_indicator"
-    model_path = f"{save_dir}/model_best.json"
+    save_dir = "model/xgboost"
+    model_path = f"{save_dir}/xgboost_model_regressor.json"
+    future_days = 30
+    pre_days = 10
     bst = XGBRegressor()
     bst.load_model(model_path)
 
@@ -544,7 +592,11 @@ def demo_of_load_xgboost_model():
         for line in f:
             test_files.append(line.strip())
 
-    test_dataset = IndictorDataset(test_files, future_days=30, one_hot_flag=False)
+    # test_files = [os.path.join("data_us", item) for item in os.listdir("data_us")]
+    # test_files = random.sample(test_files, int(len(test_files)*0.2))
+
+    test_dataset = IndictorDataset(test_files, future_days=future_days, pre_days=pre_days, one_hot_flag=False)
+    
     X_test, y_test = test_dataset.get_data_and_label()
     preds = bst.predict(X_test)
 
@@ -564,8 +616,8 @@ def demo_of_load_xgboost_model():
         input("press any key to continue")
 
 def demo_of_xgboost_feature():
-    save_dir = "model/MLP_indicator"
-    model_path = f"{save_dir}/model_best.json"
+    save_dir = "model/xgboost"
+    model_path = f"{save_dir}/xgboost_model_regressor.json"
     bst = XGBRegressor()
     bst.load_model(model_path)
 
@@ -576,7 +628,7 @@ def demo_of_xgboost_feature():
         for line in f:
             test_files.append(line.strip())
 
-    test_dataset = IndictorDataset(test_files, future_days=30, one_hot_flag=False)
+    test_dataset = IndictorDataset(test_files, future_days=30, pre_days=10,one_hot_flag=False)
     X_test, y_test = test_dataset.get_data_and_label()
     # preds = bst.predict(X_test)
 
@@ -641,9 +693,11 @@ def demo_of_train_svm():
     plt.show()
 
 def demo_of_KNN():
-    save_dir = "model/MLP_indicator"
+    save_dir = "model/knn"
+    os.makedirs(save_dir, exist_ok=True)
     
     future_days = 30
+    pre_days = 10
     data_root = "data"
     one_hot = False
     
@@ -659,22 +713,22 @@ def demo_of_KNN():
         for file in test_files:
             f.write(file + "\n")
 
-    train_dataset = IndictorDataset(train_files, future_days=future_days,one_hot_flag=one_hot)
-    test_dataset = IndictorDataset(test_files, future_days=future_days, one_hot_flag=one_hot)
+    train_dataset = IndictorDataset(train_files, future_days=future_days, pre_days=pre_days, one_hot_flag=one_hot)
+    test_dataset = IndictorDataset(test_files, future_days=future_days, pre_days=pre_days, one_hot_flag=one_hot)
 
     X_train, y_train = train_dataset.get_data_and_label()
     X_test, y_test = test_dataset.get_data_and_label()
 
     for i in range(len(y_train)):
         if y_train[i] > 0.05:
-            y_train[i] = 1
+            y_train[i] = 2
         elif y_train[i] < 0.00:
             y_train[i] = 0
         else:
             y_train[i] = 1
     for i in range(len(y_test)):
         if y_test[i] > 0.05:
-            y_test[i] = 1
+            y_test[i] = 2
         elif y_test[i] < 0.0:
             y_test[i] = 0
         else:
@@ -710,11 +764,13 @@ def demo_of_KNN():
         print(f"y_pred: {y_pred[i]}")
         input("press any key to continue")
 
-def demo_of_random_forest():
-    save_dir = "model/MLP_indicator"
+def demo_of_random_forest_classifier():
+    save_dir = "model/random_forest"
+    os.makedirs(save_dir,exist_ok=True)
     
     future_days = 30
-    data_root = "data_us"
+    pre_days = 10
+    data_root = "mini_data"
     one_hot = False
     
     train_ratio = 0.8
@@ -729,8 +785,8 @@ def demo_of_random_forest():
         for file in test_files:
             f.write(file + "\n")
 
-    train_dataset = IndictorDataset(train_files, future_days=future_days,one_hot_flag=one_hot)
-    test_dataset = IndictorDataset(test_files, future_days=future_days, one_hot_flag=one_hot)
+    train_dataset = IndictorDataset(train_files, future_days=future_days, pre_days=pre_days, one_hot_flag=one_hot)
+    test_dataset = IndictorDataset(test_files, future_days=future_days, pre_days=pre_days, one_hot_flag=one_hot)
 
     X_train, y_train = train_dataset.get_data_and_label()
     X_test, y_test = test_dataset.get_data_and_label()
@@ -757,8 +813,8 @@ def demo_of_random_forest():
 
     # save model
     
-    joblib.dump(clf, f"{save_dir}/knn_model_best.pkl")
-    print(f"model saved to {save_dir}/knn_model_best.pkl")
+    joblib.dump(clf, f"{save_dir}/random_forest_classifier.pkl")
+    print(f"model saved to {save_dir}/random_forest_classifier.pkl")
     
     y_pred = clf.predict(X_test)
 
@@ -781,6 +837,56 @@ def demo_of_random_forest():
         input("press any key to continue")
 
 
+def demo_of_random_forest_regressor():
+    save_dir = "model/random_forest"
+    os.makedirs(save_dir,exist_ok=True)
+    
+    future_days = 30
+    pre_days = 10
+    data_root = "data"
+    one_hot = False
+    
+    train_ratio = 0.8
+
+    csv_files = [os.path.join(data_root, item) for item in os.listdir(data_root)]
+    train_files = random.sample(csv_files, int(len(csv_files) * train_ratio))
+    test_files = [file for file in csv_files if file not in train_files]
+    with open(f"{save_dir}/train_files.txt", "w") as f:
+        for file in train_files:
+            f.write(file + "\n")
+    with open(f"{save_dir}/test_files.txt", "w") as f:
+        for file in test_files:
+            f.write(file + "\n")
+
+    train_dataset = IndictorDataset(train_files, future_days=future_days, pre_days=pre_days, one_hot_flag=one_hot)
+    test_dataset = IndictorDataset(test_files, future_days=future_days, pre_days=pre_days, one_hot_flag=one_hot)
+
+    X_train, y_train = train_dataset.get_data_and_label()
+    X_test, y_test = test_dataset.get_data_and_label()
+
+    clf = RandomForestRegressor(n_estimators=100)
+    clf.fit(X_train, y_train)
+
+    joblib.dump(clf, f"{save_dir}/random_forest_regressor.pkl")
+    print(f"model saved to {save_dir}/random_forest_regressor.pkl")
+
+    preds = clf.predict(X_test)
+
+    # calculate the IC and IR
+    ic = np.corrcoef(preds, y_test)[0, 1]
+    print(f"IC: {ic}")
+
+    plt.scatter(y_test, preds)
+    plt.xlabel("y_test")
+    plt.ylabel("preds")
+    plt.show()
+
+    for i in range(len(preds)):
+        print(f"y_test: {y_test[i]}")
+        print(f"preds: {preds[i]}")
+        input("press any key to continue")
+
+
 if __name__ == "__main__":
     # train_TCN()
     # train_MLP()
@@ -788,12 +894,13 @@ if __name__ == "__main__":
     # train_MLP_indicator()
     # test_MLP_indicator()
     # train_xgboost_classifier()
-    # train_xgboost_regressor()
+    train_xgboost_regressor()
     # demo_of_load_xgboost_model()
     # demo_of_xgboost_feature()
     # demo_of_train_svm()
     # demo_of_KNN()
-    demo_of_random_forest()
+    # demo_of_random_forest_classifier()
+    # demo_of_random_forest_regressor()
 
 
 
