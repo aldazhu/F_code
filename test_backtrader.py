@@ -129,10 +129,10 @@ def demo_of_ShortTermReversalEffectinStocks():
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    data_root = "data_zh1000"
+    data_root = "data_train"
     test_all_data = True
-    from_date = datetime.datetime(2022, 1, 5)
-    to_date = datetime.datetime(2024, 1, 30)
+    from_date = datetime.datetime(2018, 1, 5)
+    to_date = datetime.datetime(2022, 1, 30)
 
     data_names = [
         f'{data_root}/sz.300628.csv',

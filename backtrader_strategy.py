@@ -1275,8 +1275,12 @@ class XGBoostStrategy(StragegyTemplate):
         self.bst = XGBRegressor()
         self.bst.load_model(self.model_path)
         self.pre_days = 9
+        self.future_days = 15
         self.first_obv = []
         self.emas = []
+
+        self.train_data = []
+        self.train_label = []
         for i, data in enumerate(self.datas):
             # RSI
             self.emas.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.min_start_index))
@@ -1349,35 +1353,58 @@ class XGBoostStrategy(StragegyTemplate):
             return None
         
         return x_i
+    
+    def get_label(self, data_index, time_index):
+        future_days = self.future_days
+        try:
+            future_price = self.datas[data_index].close[time_index + future_days]
+            current_price = self.datas[data_index].close[time_index]
+            label = (future_price - current_price) / current_price
+        except:
+            label = None
+        return label
 
+    def stop(self):
+        pass
+        # np.save("model/xgboost/test_data.npy", self.train_data)
+        # np.save("model/xgboost/test_label.npy", self.train_label)
+        self.analyze_the_history()
 
     def next(self):
         if self.order:
             return
         
-        is_first = True
-        if is_first:
-            for i, data in enumerate(self.datas):
-                self.first_obv.append(self.indictors_list[i]["OBV"][0])
-            is_first = False
+        # is_first = True
+        # if is_first:
+        #     for i, data in enumerate(self.datas):
+        #         self.first_obv.append(self.indictors_list[i]["OBV"][0])
+        #     is_first = False
 
         
         for i, data in enumerate(self.datas):
             x_i = self.get_predays_indictor(i, 0)
             if x_i is None:
                 continue
+            label = self.get_label(i, 0)
+            if label is None:
+                continue
+            self.train_data.append(x_i)
+            self.train_label.append(label)
+
             x_i = np.array([x_i])
             # print(f"x_i shae: {x_i.shape}")
+            
             y_i = self.bst.predict(x_i)
 
             # print(f"x_i: \n {x_i}")
             # print(f"y_i_pred: \n {y_i}")
+            # print(f"label: {label}")
             if self.getposition(data).size <= 0:
                 if y_i[0] > 0.3:
                     self.order = self.buy(data)
             else:
                 hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
-                if hold_days >= 30 :
+                if hold_days >= self.future_days:
                     self.order = self.sell(data)
         
         self.query_holding_number()

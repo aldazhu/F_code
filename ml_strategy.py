@@ -529,6 +529,12 @@ def train_xgboost_regressor():
 
     X_train, y_train = train_dataset.get_data_and_label()
     X_test, y_test = test_dataset.get_data_and_label()
+
+    # X_train = np.load("model/xgboost/train_data.npy")
+    # y_train = np.load("model/xgboost/train_label.npy")
+
+    # X_test = np.load("model/xgboost/test_data.npy")
+    # y_test = np.load("model/xgboost/test_label.npy")
     # # create model instance
     # bst = XGBRegressor()
     # # 定义要搜索的超参数网格
@@ -546,7 +552,7 @@ def train_xgboost_regressor():
     # print(grid_search.best_params_)
 
     # set the best parameters
-    bst = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.1, objective='reg:squarederror')
+    bst = XGBRegressor(n_estimators=150, max_depth=4, learning_rate=0.1, objective='reg:squarederror')
 
     # fit model
     bst.fit(X_train, y_train)
