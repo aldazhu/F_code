@@ -1409,4 +1409,44 @@ class XGBoostStrategy(StragegyTemplate):
         
         self.query_holding_number()
 
+
+class TurtleTradingStrategy(StragegyTemplate):
+    params = (
+        ('ema_period', 20),
+        ('atr_period', 20),
+        ('high_period', 20),
+        ('low_period', 10),
+        )
+
+    def __init__(self):
+        super().__init__()
+        self.ema = []
+        self.atr = []
+        self.max_price = []
+        self.min_price = []
+        self.break_price = []
+        self.unit = []
+        
+        for i, data in enumerate(self.datas):
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.atr.append(bt.indicators.ATR(data, period=self.params.atr_period))
+            self.max_price.append(bt.indicators.Highest(data.high, period=self.params.high_period))
+            self.min_price.append(bt.indicators.Lowest(data.low, period=self.params.low_period))
+            
+
+    def next(self):
+        if self.order:
+            return
+
+        for i, data in enumerate(self.datas):
+            if data.close[0] < self.min_price[i][-1] :
+                unit = int(self.atr[i][0]) + 1 
+                self.logger.info(f"{data.datetime.date(0)}: name : {data._name} buy , today close at {data.close[0]}   unit: {unit}")
+                self.order = self.buy(data, size=unit)
+            elif data.close[0] > self.max_price[i][-1]:
+                sell_size = self.getposition(data).size
+                self.order = self.sell(data, size=sell_size)
+                
+        
+        self.query_holding_number()
         
