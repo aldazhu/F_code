@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import backtrader.talib as ta
-from backtrader_indicator import RSRS, RSRS_Norm, Diff
+from backtrader_indicator import RSRS, RSRS_Norm, Diff, AverageTrueRangeStop
 from my_logger import logger
 
 
@@ -364,7 +364,9 @@ class StragegyTemplate(bt.Strategy):
 
 
     def stop(self):
-        self.analyze_the_history()
+        pass
+        self.logger.info(f" final value: {self.broker.get_value():.2f}")
+        # self.analyze_the_history()
 
     def get_final_change_percent(self):
         return self.change_percent_final
@@ -1147,16 +1149,19 @@ class EMATrendStrategy(StragegyTemplate):
     params = (
         ('ema_period', 20),
         ('ema_period2', 10),
+        ('atr_period', 14),
+        ('atr_multiplier', 2.0),
     )
 
     def __init__(self):
         super().__init__()
         self.ema = []
         self.ema2 = []
+        self.atr_stop = []
         for i, data in enumerate(self.datas):
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
             self.ema2.append(bt.indicators.ExponentialMovingAverage(data.volume, period=self.params.ema_period2))
-
+            self.atr_stop.append(AverageTrueRangeStop(data, atr_period=self.params.atr_period, multiplier=self.params.atr_multiplier))
 
     def next(self):
         if self.order:
@@ -1167,6 +1172,7 @@ class EMATrendStrategy(StragegyTemplate):
                 if self.ema[i][0] >= self.ema[i][-1] and self.ema[i][-1] >= self.ema[i][-2] and self.ema2[i][0] > self.ema2[i][-1]:
                     self.order = self.buy(data)
             else:
+                # if data.close[0] < self.atr_stop[i]:
                 if self.ema[i][0] < self.ema[i][-1] and self.ema[i][-1] < self.ema[i][-2]:
                     self.order = self.sell(data)
         self.query_holding_number()
@@ -1413,25 +1419,33 @@ class XGBoostStrategy(StragegyTemplate):
 class TurtleTradingStrategy(StragegyTemplate):
     params = (
         ('ema_period', 20),
+        ('ema_long_period', 50),
         ('atr_period', 20),
-        ('high_period', 20),
+        ('high_period', 50),
         ('low_period', 10),
+        ('k_atr', 1.5),
         )
 
     def __init__(self):
         super().__init__()
         self.ema = []
+        self.ema_long = []
         self.atr = []
         self.max_price = []
         self.min_price = []
         self.break_price = []
         self.unit = []
+        self.atr_stop = []
+        
         
         for i, data in enumerate(self.datas):
-            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            # self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema_long.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_long_period))
             self.atr.append(bt.indicators.ATR(data, period=self.params.atr_period))
             self.max_price.append(bt.indicators.Highest(data.high, period=self.params.high_period))
             self.min_price.append(bt.indicators.Lowest(data.low, period=self.params.low_period))
+            self.atr_stop.append(AverageTrueRangeStop(data, atr_period=self.params.atr_period, multiplier=self.params.k_atr))
+            self.unit.append(0)
             
 
     def next(self):
@@ -1439,13 +1453,21 @@ class TurtleTradingStrategy(StragegyTemplate):
             return
 
         for i, data in enumerate(self.datas):
-            if data.close[0] < self.min_price[i][-1] :
-                unit = int(self.atr[i][0]) + 1 
+            if data.close[0] >= self.max_price[i][-1] :
+                account_value = self.broker.get_value()
+                if self.unit[i] == 0:
+                    # first time to buy
+                    unit = self.broker.get_value() * 0.01 / data.close[0] 
+                else:
+                    unit = self.unit[i] / 2
+                if unit < 1:
+                    unit = 1
                 self.logger.info(f"{data.datetime.date(0)}: name : {data._name} buy , today close at {data.close[0]}   unit: {unit}")
                 self.order = self.buy(data, size=unit)
-            elif data.close[0] > self.max_price[i][-1]:
+            elif data.close[0] < self.max_price[i][0] - (self.params.k_atr * self.atr[i][0]) :
                 sell_size = self.getposition(data).size
                 self.order = self.sell(data, size=sell_size)
+                self.unit[i] = 0
                 
         
         self.query_holding_number()

@@ -48,5 +48,16 @@ class Diff(bt.Indicator):
     def next(self):
         self.lines.diff[0] = self.diff[0]
 
+class AverageTrueRangeStop(bt.Indicator):
+    lines = ('stop',)
+    params = (('multiplier', 3), ('atr_period', 14))
+    def __init__(self):
+        self.atr = bt.indicators.ATR(self.data, period=self.p.atr_period)
+        self.height = bt.indicators.Highest(self.data.high, period=self.p.atr_period)
+        self.atr_ema = bt.indicators.EMA(self.atr, period=self.p.atr_period)
+    def next(self):
+        self.lines.stop[0] = self.height[0] - self.p.multiplier * self.atr_ema[0]
+        self.plotinfo.plotmaster = self.data  # Ensure the indicator is plotted on the main chart
+
     
     

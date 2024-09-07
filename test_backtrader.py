@@ -131,12 +131,13 @@ def demo_of_ShortTermReversalEffectinStocks():
 def demo_of_simple_strategy():
     # Create a Data Feed
     data_root = "data"
-    data_root = "data_train"
+    # data_root = "data_train"
     test_all_data = True
-    from_date = datetime.datetime(2018, 1, 5)
-    to_date = datetime.datetime(2022, 1, 30)
+    from_date = datetime.datetime(2022, 1, 5)
+    to_date = datetime.datetime(2024, 1, 30)
+    cash = 10000
 
-    visual_data_one_by_one = False
+    visual_data_one_by_one = True
 
     data_names = [
         f'{data_root}/sz.300628.csv',
@@ -173,12 +174,12 @@ def demo_of_simple_strategy():
     stake = 1
 
     strategies = [
-        # # NewHighStrategy ,# ok
+        # NewHighStrategy ,# ok
         # NewLowStrategy, # ok
         # MovingAverageStrategy, # ok
         # CombinedIndicatorStrategy, # ok
         # RSIStrategy, # ok
-        CCIStrategy,  # ok # stop loss is importance, left side trader, 
+        # CCIStrategy,  # ok # stop loss is importance, left side trader, 
         # DoubleEmaStrategy, # ok
         # MACDTrendFollowingStrategy, # ok
         # BollingerBandsStrategy, # ok
@@ -186,19 +187,20 @@ def demo_of_simple_strategy():
         # PriceMomumentStrategy,
         # InvertPriceMomumentStrategy,
         # PriceMomumentStrategyForUS,
-        # EMATrendStrategy, # good for long trend, right side trader 
+        EMATrendStrategy, # good for long trend, right side trader 
         # LongLowerShadowCandlestickStrategy,
         # DiffStrategy,
-        XGBoostStrategy,
+        # XGBoostStrategy,
+        # TurtleTradingStrategy,
     ]
 
     if visual_data_one_by_one:
         random.shuffle(datas)
         for data in datas:
             print(f"Processing {data._name} ...")
-            test_backtrader([data], strategies=strategies, cash=1000000.0, commission=0.001, stake=stake, visual_data=True)
+            test_backtrader([data], strategies=strategies, cash=cash, commission=0.001, stake=stake, visual_data=True)
     else:
-        test_backtrader(datas, strategies=strategies, cash=1000000.0, commission=0.001, stake=stake)
+        test_backtrader(datas, strategies=strategies, cash=cash, commission=0.001, stake=stake)
 
 
 def demo_of_multiple_data():
