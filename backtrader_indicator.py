@@ -50,14 +50,33 @@ class Diff(bt.Indicator):
 
 class AverageTrueRangeStop(bt.Indicator):
     lines = ('stop',)
-    params = (('multiplier', 3), ('atr_period', 14))
+    params = (('multiplier', 3), ('atr_period', 14), ('price_type', 'high'))
     def __init__(self):
         self.atr = bt.indicators.ATR(self.data, period=self.p.atr_period)
-        self.height = bt.indicators.Highest(self.data.high, period=self.p.atr_period)
+        self.highest = bt.indicators.Highest(self.data.high, period=self.p.atr_period)
+        self.lowest = bt.indicators.Lowest(self.data.low, period=self.p.atr_period)
         self.atr_ema = bt.indicators.EMA(self.atr, period=self.p.atr_period)
+        self.ema = bt.indicators.EMA(self.data.close, period=self.p.atr_period)
     def next(self):
-        self.lines.stop[0] = self.height[0] - self.p.multiplier * self.atr_ema[0]
-        self.plotinfo.plotmaster = self.data  # Ensure the indicator is plotted on the main chart
+        if self.p.price_type == 'close':
+            self.lines.stop[0] = self.ema[0] - self.p.multiplier * self.atr_ema[0] # close [-1] is the last close price,cant use self.data.close[0] because it is the current close price
+        elif self.p.price_type == 'low':
+            self.lines.stop[0] = self.lowest[-1] - self.p.multiplier * self.atr_ema[0] # low [-1] is the last low price, cant use self.lowest[0] because it is the current low price
+        elif self.p.price_type == 'high':
+            self.lines.stop[0] = self.highest[0] - self.p.multiplier * self.atr_ema[0]
+        else:
+            self.lines.stop[0] = self.highest[0] - self.p.multiplier * self.atr_ema[0]
+        # self.plotinfo.plotmaster = self.data  # Ensure the indicator is plotted on the main chart
+
+class ATRNormalized(bt.Indicator):
+    lines = ('atr_norm',)
+    params = (('atr_period', 14), ('ema_period', 20))
+    def __init__(self):
+        self.atr = bt.indicators.ATR(self.data, period=self.p.atr_period)
+        self.price_ema = bt.indicators.EMA((self.data.close + self.data.open) / 2.0, period=self.p.ema_period)
+        self.atr_norm = self.atr / self.price_ema
+    def next(self):
+        self.lines.atr_norm[0] = self.atr_norm[0]
 
     
     

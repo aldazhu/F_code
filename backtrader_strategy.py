@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import backtrader.talib as ta
-from backtrader_indicator import RSRS, RSRS_Norm, Diff, AverageTrueRangeStop
+from backtrader_indicator import RSRS, RSRS_Norm, Diff, AverageTrueRangeStop, ATRNormalized
 from my_logger import logger
 
 
@@ -510,10 +510,18 @@ class CCIStrategy(StragegyTemplate):
         super().__init__()
         self.cci = []
         self.highest = []
+        self.atr = []
+        self.stop_loss = [99999999 for i in range(len(self.datas))]
+        self.ema = []
+        self.cci_ema = []
+        
         for i, data in enumerate(self.datas):
             print(f"data name: {data._name}, num: {i}")
             self.cci.append(bt.indicators.CCI(data, period=self.params.cci_period))
+            self.cci_ema.append(bt.indicators.EMA(self.cci[i], period=self.params.cci_period))
             self.highest.append(bt.indicators.Highest(data.high, period=self.params.high_period))
+            self.atr.append(bt.indicators.ATR(data, period=self.params.cci_period))
+            self.ema.append(bt.indicators.EMA(data.close, period=30))
             print(f"done with {data._name}")
 
         
@@ -529,9 +537,14 @@ class CCIStrategy(StragegyTemplate):
             if self.getposition(data).size > 0:
                 if self.cci[i][0] < self.params.cci_upper and self.cci[i][-1] >= self.params.cci_upper:
                     self.order = self.sell(data)
+                elif data.close[0] < self.stop_loss[i]:
+                    self.order = self.sell(data)
+                    self.stop_loss[i] = 99999999
             else:
                 if self.cci[i][0] > self.params.cci_lower and self.cci[i][-1] <= self.params.cci_lower:
                     self.order = self.buy(data)
+                    self.stop_loss[i] = data.close[0] - self.atr[i][0] * 1.5
+
             print(f"done with {data._name}")
         
                 
@@ -783,11 +796,15 @@ class NewLowStrategy(StragegyTemplate):
         self.low = []
         self.ema = []
         self.ema_sell = []
+        self.stop_loss = [999999 for i in range(len(self.datas))]
+        self.atr = []
         for i, data in enumerate(self.datas):
             self.high.append(bt.indicators.Highest(data.high, period=self.params.highest_window))
             self.low.append(bt.indicators.Lowest(data.low, period=self.params.lowest_window))
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
             self.ema_sell.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_sell_period))
+            self.atr.append(bt.indicators.ATR(data, period=14))
+
 
     def next(self):
         if self.order:
@@ -798,11 +815,13 @@ class NewLowStrategy(StragegyTemplate):
                 if self.low[i][0] < self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
+                    self.stop_loss[i] = data.close[0] - self.atr[i][0] * 2
             else:
                 # hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
                 if data.close[0] > self.high[i][-1] :
                     print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
                     self.order = self.sell(data)
+                    self.stop_loss[i] = 999999
         self.query_holding_number()
         # stop loss
         # self.stop_loss_watch_dog()
@@ -1147,8 +1166,8 @@ class PriceMomumentStrategyForUS(StragegyTemplate):
 
 class EMATrendStrategy(StragegyTemplate):
     params = (
-        ('ema_period', 20),
-        ('ema_period2', 10),
+        ('ema_period', 30),
+        ('ema_period2', 15),
         ('atr_period', 14),
         ('atr_multiplier', 2.0),
     )
@@ -1158,10 +1177,13 @@ class EMATrendStrategy(StragegyTemplate):
         self.ema = []
         self.ema2 = []
         self.atr_stop = []
+        self.atr = []
+        self.atr_normlized = []
         for i, data in enumerate(self.datas):
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
             self.ema2.append(bt.indicators.ExponentialMovingAverage(data.volume, period=self.params.ema_period2))
             self.atr_stop.append(AverageTrueRangeStop(data, atr_period=self.params.atr_period, multiplier=self.params.atr_multiplier))
+            self.atr.append(bt.indicators.ATR(data, period=self.params.atr_period))
 
     def next(self):
         if self.order:
@@ -1471,4 +1493,97 @@ class TurtleTradingStrategy(StragegyTemplate):
                 
         
         self.query_holding_number()
+
+class GridTradingStrategy(StragegyTemplate):
+    params = (
+        ('grid_size', 0.02),
+        ('grid_num', 10),
+        ('hold_days', 10),
+        ('short_period', 10),
+        ('long_period', 30),
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.grid = []
+        self.buy_signals = []
+        self.sell_signals = []
+        self.hold_days = self.params.hold_days
+
+        for i, data in enumerate(self.datas):
+            self.grid.append(0)
+            self.buy_signals.append(False)
+            self.sell_signals.append(False)
+            self.short_ma = bt.indicators.SimpleMovingAverage(data.close, period=self.params.short_period)
+            self.long_ma = bt.indicators.SimpleMovingAverage(data.close, period=self.params.long_period)
+
+    def next(self):
+        for i, data in enumerate(self.datas):
+            if self.short_ma[i] > self.long_ma[i]:
+                self.buy_signals[i] = True
+                self.sell_signals[i] = False
+            elif self.short_ma[i] < self.long_ma[i]:
+                self.buy_signals[i] = False
+                self.sell_signals[i] = True
+
+            if self.buy_signals[i]:
+                self.grid[i] += 1
+                if self.grid[i] <= self.params.grid_num:
+                    self.buy(data, size=self.params.grid_size)
+                    self.logger.info(f"BUY {data._name} at {data.close[0]}")
+
+            if self.sell_signals[i]:
+                self.grid[i] -= 1
+                if self.grid[i] >= -self.params.grid_num:
+                    self.sell(data, size=self.params.grid_size)
+                    self.logger.info(f"SELL {data._name} at {data.close[0]}")
+
+        self.query_holding_number()
+
+
+class GridTradingWithTimingStrategy(StragegyTemplate):
+    params = (
+        ('grid_size', 5),  # 网格大小
+        ('grid_levels', 10),  # 网格层数
+        ('timing_indicator', 'RSI'),  # 择时指标，这里以SMA为例
+        ('timing_period', 20),  # 择时指标周期
+        ('start_cash', 10000),  # 初始资金
+    )
+
+    def __init__(self):
+        super().__init__()
+        # 初始化择时指标
+        if self.params.timing_indicator == 'SMA':
+            self.timing_line = bt.indicators.SimpleMovingAverage(self.data.close, period=self.params.timing_period)
+        elif self.params.timing_indicator == 'RSI':
+            self.timing_line = bt.indicators.RSI(self.data.close, period=self.params.timing_period)
+
+        # 初始化网格
+        self.grid = []
+        for i in range(self.params.grid_levels):
+            self.grid.append(self.params.start_cash / self.params.grid_levels * (i + 1))
+
+    def next(self):
+
+        # 检查择时指标
+        if self.params.timing_indicator == 'SMA':
+            if self.data.close[0] > self.timing_line[0]:
+                # 当收盘价高于SMA时，视为买入信号
+                for level in self.grid:
+                    if self.broker.get_cash() >= level:
+                        self.buy(size=int(level / self.data.close[0]))
+            elif self.data.close[0] < self.timing_line[0]:
+                # 当收盘价低于SMA时，视为卖出信号
+                if self.position:
+                    self.sell(size=self.position.size)
+        elif self.params.timing_indicator == 'RSI':
+            if self.timing_line[0] < 30:
+                # 当RSI低于30时，视为买入信号
+                for level in self.grid:
+                    if self.broker.get_cash() >= level:
+                        self.buy(size=int(level / self.data.close[0]))
+            elif self.timing_line[0] > 70:
+                # 当RSI高于70时，视为卖出信号
+                if self.position:
+                    self.sell(size=self.position.size)
         

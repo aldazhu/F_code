@@ -137,7 +137,7 @@ def demo_of_simple_strategy():
     to_date = datetime.datetime(2024, 1, 30)
     cash = 10000
 
-    visual_data_one_by_one = True
+    visual_data_one_by_one = False
 
     data_names = [
         f'{data_root}/sz.300628.csv',
@@ -192,6 +192,8 @@ def demo_of_simple_strategy():
         # DiffStrategy,
         # XGBoostStrategy,
         # TurtleTradingStrategy,
+        # GridTradingStrategy,
+        # GridTradingWithTimingStrategy,
     ]
 
     if visual_data_one_by_one:
