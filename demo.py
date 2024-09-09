@@ -103,7 +103,7 @@ def testGroup(file,startDate,endDate):
         
     earningList, changePercent = test.test(flagList, data)
     logger.info("group changePercent: %s", changePercent)
-    utils.plotEarningRatio(earningList[:],flagList[:],data[:])
+    # utils.plotEarningRatio(earningList[:],flagList[:],data[:])
 
     return earningList[-1]
 

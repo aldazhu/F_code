@@ -131,7 +131,7 @@ def demo_of_ShortTermReversalEffectinStocks():
 def demo_of_simple_strategy():
     # Create a Data Feed
     data_root = "data"
-    data_root = "data_train"
+    # data_root = "data_test"
     test_all_data = True
     from_date = datetime.datetime(2018, 1, 5)
     to_date = datetime.datetime(2022, 1, 30)
@@ -141,15 +141,9 @@ def demo_of_simple_strategy():
     data_names = [
         f'{data_root}/sz.300628.csv',
         f'{data_root}/sz.300979.csv',
-        # f'{data_root}/sh.600000.csv',
-        # f'{data_root}/sh.600089.csv',
-        # f'{data_root}/sh.601059.csv',
-        # f'{data_root}/sh.603296.csv',
-        # f'{data_root}/sh.603501.csv',
-        # f'{data_root}/sz.000733.csv',
-        # f'{data_root}/sz.001289.csv',
-        # f'{data_root}/sz.002230.csv',
-        # f'{data_root}/sz.002714.csv',
+        f'{data_root}/sh.600000.csv',
+        f'{data_root}/sh.600089.csv',
+       
     ]
 
     if test_all_data:
@@ -178,7 +172,7 @@ def demo_of_simple_strategy():
         # MovingAverageStrategy, # ok
         # CombinedIndicatorStrategy, # ok
         # RSIStrategy, # ok
-        CCIStrategy,  # ok # stop loss is importance, left side trader, 
+        # CCIStrategy,  # ok # stop loss is importance, left side trader, 
         # DoubleEmaStrategy, # ok
         # MACDTrendFollowingStrategy, # ok
         # BollingerBandsStrategy, # ok
@@ -189,7 +183,8 @@ def demo_of_simple_strategy():
         # EMATrendStrategy, # good for long trend, right side trader 
         # LongLowerShadowCandlestickStrategy,
         # DiffStrategy,
-        XGBoostStrategy,
+        # XGBoostStrategy,
+        TurtleTradingStrategy,
     ]
 
     if visual_data_one_by_one:
