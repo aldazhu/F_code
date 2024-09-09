@@ -142,15 +142,9 @@ def demo_of_simple_strategy():
     data_names = [
         f'{data_root}/sz.300628.csv',
         f'{data_root}/sz.300979.csv',
-        # f'{data_root}/sh.600000.csv',
-        # f'{data_root}/sh.600089.csv',
-        # f'{data_root}/sh.601059.csv',
-        # f'{data_root}/sh.603296.csv',
-        # f'{data_root}/sh.603501.csv',
-        # f'{data_root}/sz.000733.csv',
-        # f'{data_root}/sz.001289.csv',
-        # f'{data_root}/sz.002230.csv',
-        # f'{data_root}/sz.002714.csv',
+        f'{data_root}/sh.600000.csv',
+        f'{data_root}/sh.600089.csv',
+       
     ]
 
     if test_all_data:
