@@ -79,4 +79,19 @@ class ATRNormalized(bt.Indicator):
         self.lines.atr_norm[0] = self.atr_norm[0]
 
     
+class SafeCCI(bt.indicators.CCI):
+    lines = ('cci',)
     
+    def __init__(self):
+        super().__init__()
+
+    def next(self):
+        try:
+            super().next()
+            
+        except ZeroDivisionError:
+            
+            self.lines.cci[0] = 0
+        except Exception as e:
+            print(e)
+            self.lines.cci[0] = 0

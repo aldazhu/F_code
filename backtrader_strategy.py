@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import backtrader.talib as ta
-from backtrader_indicator import RSRS, RSRS_Norm, Diff, AverageTrueRangeStop, ATRNormalized
+from backtrader_indicator import RSRS, RSRS_Norm, Diff, AverageTrueRangeStop, ATRNormalized, SafeCCI
 from my_logger import logger
 
 
@@ -152,6 +152,14 @@ class QuickGuideStrategy(bt.Strategy):
 
                 # Keep track of the created order to avoid a 2nd order
                 self.order = self.sell()
+
+class Bid:
+    def __init__(self, price, volume, direction, date):
+        self.price = price
+        self.volume = volume
+        self.direction = direction
+        self.date = date
+
 
 # a class of stock data , buy, sell, hold days, earning ratio etc
 class StockStatus:
@@ -348,25 +356,25 @@ class StragegyTemplate(bt.Strategy):
         holding_days = [record.hold_days for record in self.history_records]
         earning_ratio = [record.earning_ratio for record in self.history_records]
         
-        days = np.array(holding_days)
-        ratio = np.array(earning_ratio)
-        plt.scatter(days, ratio)
-        plt.xlabel('Holding days')
-        plt.ylabel('Earning ratio')
+        # days = np.array(holding_days)
+        # ratio = np.array(earning_ratio)
+        # plt.scatter(days, ratio)
+        # plt.xlabel('Holding days')
+        # plt.ylabel('Earning ratio')
 
-        # plt histgram
-        plt.figure()
-        plt.hist(ratio, bins=50)
-        plt.xlabel('Earning ratio')
-        plt.ylabel('Frequency')
+        # # plt histgram
+        # plt.figure()
+        # plt.hist(ratio, bins=50)
+        # plt.xlabel('Earning ratio')
+        # plt.ylabel('Frequency')
 
-        plt.show()
+        # plt.show()
 
 
     def stop(self):
         pass
         self.logger.info(f" final value: {self.broker.get_value():.2f}")
-        # self.analyze_the_history()
+        self.analyze_the_history()
 
     def get_final_change_percent(self):
         return self.change_percent_final
@@ -406,7 +414,7 @@ class StragegyTemplate(bt.Strategy):
                 # self.buyprice = order.executed.price
                 # self.buycomm = order.executed.comm
                 # self.max_price_from_buy = order.executed.price
-            else:  # Sell
+            elif order.issell():  # Sell
 
                 if order.data._name in self.hold_pool.pool:
                     # stock in hold pool, sell it
@@ -505,7 +513,12 @@ class RSIStrategy(StragegyTemplate):
         
 
 class CCIStrategy(StragegyTemplate):
-    params = (('cci_period', 15), ('cci_upper', 150), ('cci_lower', -150), ('high_period', 20),)
+    params = (('cci_period', 15), 
+              ('cci_upper', 150), 
+              ('cci_lower', -150), 
+              ('high_period', 20),
+              ('atr_multiplier', 3),
+              )
     def __init__(self):
         super().__init__()
         self.cci = []
@@ -518,6 +531,7 @@ class CCIStrategy(StragegyTemplate):
         for i, data in enumerate(self.datas):
             print(f"data name: {data._name}, num: {i}")
             self.cci.append(bt.indicators.CCI(data, period=self.params.cci_period))
+            # self.cci.append(SafeCCI(data, period=self.params.cci_period))
             self.cci_ema.append(bt.indicators.EMA(self.cci[i], period=self.params.cci_period))
             self.highest.append(bt.indicators.Highest(data.high, period=self.params.high_period))
             self.atr.append(bt.indicators.ATR(data, period=self.params.cci_period))
@@ -533,19 +547,22 @@ class CCIStrategy(StragegyTemplate):
             return
 
         for i, data in enumerate(self.datas):
-            print(f"data name: {data._name}, num: {i}")
+            
             if self.getposition(data).size > 0:
                 if self.cci[i][0] < self.params.cci_upper and self.cci[i][-1] >= self.params.cci_upper:
                     self.order = self.sell(data)
                 elif data.close[0] < self.stop_loss[i]:
                     self.order = self.sell(data)
+                    
                     self.stop_loss[i] = 99999999
             else:
                 if self.cci[i][0] > self.params.cci_lower and self.cci[i][-1] <= self.params.cci_lower:
                     self.order = self.buy(data)
-                    self.stop_loss[i] = data.close[0] - self.atr[i][0] * 1.5
+                    
+                    self.stop_loss[i] = data.close[0] - self.atr[i][0] * self.params.atr_multiplier
 
-            print(f"done with {data._name}")
+            
+        self.query_holding_number()
         
                 
 
@@ -744,7 +761,7 @@ class NewHighStrategy(StragegyTemplate):
     params = (
         ('highest_window', 30),
         ('lowest_window', 15),
-        ('ema_period', 10),
+        ('ema_period', 30),
         ('ema_sell_period', 10)
     )
 
@@ -756,6 +773,8 @@ class NewHighStrategy(StragegyTemplate):
         self.ema_sell = []
         self.diff = [] # high - low
         self.rsi = []
+        self.atr = []
+        self.stop_loss = [999999 for i in range(len(self.datas))]
         for i, data in enumerate(self.datas):
             self.high.append(bt.indicators.Highest(data.high, period=self.params.highest_window))
             self.low.append(bt.indicators.Lowest(data.low, period=self.params.lowest_window))
@@ -763,6 +782,7 @@ class NewHighStrategy(StragegyTemplate):
             self.ema_sell.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_sell_period))
             self.diff.append(Diff(data,ema_period=self.params.ema_period))
             self.rsi.append(bt.indicators.RSI_Safe(data.close, period=14))
+            self.atr.append(bt.indicators.ATR(data, period=14))
 
     def next(self):
         if self.order:
@@ -770,13 +790,21 @@ class NewHighStrategy(StragegyTemplate):
 
         for i, data in enumerate(self.datas):
             if self.getposition(data).size <= 0 :
-                if data.close[0] > self.high[i][-1] and self.diff[i][0] > 0 and data.close[0] > self.ema[i][0]:
+                if data.close[0] > self.high[i][-1] and self.diff[i][0] > 0 and self.rsi[i][0] > 50 and data.close[0] > self.ema[i][0] and self.ema[i][0] > self.ema[i][-1] and self.ema[i][-1] > self.ema[i][-2]:
                     # print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
                     self.order = self.buy(data)
+                    self.stop_loss[i] = data.close[0] - self.atr[i][0] * 2
             else:
-                if data.close[0] < self.ema[i][0]  or (self.rsi[i][-1] > 70 and self.rsi[i][0] < 70):
+                
+                if data.close[0] < self.ema[i][0]  or data.close[0] < self.stop_loss[i]:
                     # print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
                     self.order = self.sell(data)
+                    self.stop_loss[i] = 999999
+                else:
+                    earning_ratio = (data.close[0] - self.hold_pool.get_record(data._name).buy_price) / self.hold_pool.get_record(data._name).buy_price
+                    if earning_ratio > 0.5:
+                        self.stop_loss[i] = data.high[0] - self.atr[i][0] * 2
+            
         # stop loss
         # self.stop_loss_watch_dog()
         # self.stop_eaning_watch_dog()
@@ -1445,7 +1473,7 @@ class TurtleTradingStrategy(StragegyTemplate):
         ('atr_period', 20),
         ('high_period', 50),
         ('low_period', 10),
-        ('k_atr', 1.5),
+        ('k_atr', 2),
         )
 
     def __init__(self):
@@ -1490,7 +1518,6 @@ class TurtleTradingStrategy(StragegyTemplate):
                 sell_size = self.getposition(data).size
                 self.order = self.sell(data, size=sell_size)
                 self.unit[i] = 0
-                
         
         self.query_holding_number()
 
@@ -1541,49 +1568,111 @@ class GridTradingStrategy(StragegyTemplate):
         self.query_holding_number()
 
 
-class GridTradingWithTimingStrategy(StragegyTemplate):
+
+class GroupInvertStrategy(StragegyTemplate):
     params = (
-        ('grid_size', 5),  # 网格大小
-        ('grid_levels', 10),  # 网格层数
-        ('timing_indicator', 'RSI'),  # 择时指标，这里以SMA为例
-        ('timing_period', 20),  # 择时指标周期
-        ('start_cash', 10000),  # 初始资金
+        ('hold_days', 10),
+        ('cci_period', 15),
+        ('cci_threshold', 150), # boundary value 0 - cci_threshold, 0 + cci_threshold
+        ('rsi_period', 15),
+        ('rsi_threshold', 20), # boundary value 50 - rsi_threshold, 50 + rsi_threshold
+        ('ema_period', 30),
+        ('ema_threshold', 0.1),
+        ('atr_period', 14),
+        ('atr_multiplier', 1.5), # stop loss threshold
+        ('max_stock_num', 50),
+        
     )
 
     def __init__(self):
         super().__init__()
-        # 初始化择时指标
-        if self.params.timing_indicator == 'SMA':
-            self.timing_line = bt.indicators.SimpleMovingAverage(self.data.close, period=self.params.timing_period)
-        elif self.params.timing_indicator == 'RSI':
-            self.timing_line = bt.indicators.RSI(self.data.close, period=self.params.timing_period)
+        self.ema = []
+        self.cci = []
+        self.rsi = []
+        self.atr = []
+        self.stop_loss = [999999 for i in range(len(self.datas))]
+        self.buy_size = [0 for i in range(len(self.datas))]
+        self.high = []
 
-        # 初始化网格
-        self.grid = []
-        for i in range(self.params.grid_levels):
-            self.grid.append(self.params.start_cash / self.params.grid_levels * (i + 1))
+        for i, data in enumerate(self.datas):
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            # self.cci.append(bt.indicators.CCI(data, period=self.params.cci_period))
+            self.cci.append(SafeCCI(data, period=self.params.cci_period))
+            self.rsi.append(bt.indicators.RSI(data.close, period=self.params.rsi_period))
+            self.atr.append(bt.indicators.ATR(data, period=self.params.atr_period))
+            self.high.append(bt.indicators.Highest(data.high, period=self.params.ema_period))
+
+    def get_cci_signal(self, data_index):
+        '''
+        cci_signal = 0: no signal
+        cci_signal = 1: buy signal
+        cci_signal = -1: sell signal
+        '''
+        cci_signal = 0
+        if self.cci[data_index][0] > 0 - self.params.cci_threshold and self.cci[data_index][-1] <= 0 - self.params.cci_threshold:
+            cci_signal = 1
+        elif self.cci[data_index][0] < self.params.cci_threshold and self.cci[data_index][-1] >= self.params.cci_threshold:
+            cci_signal = -1
+        return cci_signal
+    
+    def get_rsi_signal(self, data_index):
+        '''
+        rsi_signal = 0: no signal
+        rsi_signal = 1: buy signal
+        rsi_signal = -1: sell signal
+        '''
+        rsi_signal = 0
+        if self.rsi[data_index][0] > 50 - self.params.rsi_threshold and self.rsi[data_index][-1] <= 50 - self.params.rsi_threshold:
+            rsi_signal = 1
+        elif self.rsi[data_index][0] < 50 + self.params.rsi_threshold and self.rsi[data_index][-1] >= 50 + self.params.rsi_threshold:
+            rsi_signal = -1
+
+        return rsi_signal
+    
+    def get_new_low_signal(self, data_index):
+        '''
+        new_low_signal = 0: no signal
+        new_low_signal = 1: buy signal
+        new_low_signal = -1: sell signal
+        '''
+        new_low_signal = 0
+
 
     def next(self):
+        if self.order:
+            return
 
-        # 检查择时指标
-        if self.params.timing_indicator == 'SMA':
-            if self.data.close[0] > self.timing_line[0]:
-                # 当收盘价高于SMA时，视为买入信号
-                for level in self.grid:
-                    if self.broker.get_cash() >= level:
-                        self.buy(size=int(level / self.data.close[0]))
-            elif self.data.close[0] < self.timing_line[0]:
-                # 当收盘价低于SMA时，视为卖出信号
-                if self.position:
-                    self.sell(size=self.position.size)
-        elif self.params.timing_indicator == 'RSI':
-            if self.timing_line[0] < 30:
-                # 当RSI低于30时，视为买入信号
-                for level in self.grid:
-                    if self.broker.get_cash() >= level:
-                        self.buy(size=int(level / self.data.close[0]))
-            elif self.timing_line[0] > 70:
-                # 当RSI高于70时，视为卖出信号
-                if self.position:
-                    self.sell(size=self.position.size)
+        for i, data in enumerate(self.datas):
+            cci_signal = self.get_cci_signal(i)
+            rsi_signal = self.get_rsi_signal(i)
+            if cci_signal == 1 or rsi_signal == 1 :
+                if self.getposition(data).size > 0 and self.buy_size[i] > 0:
+                    self.buy_size[i] = self.buy_size[i] / 2 # half the size
+                else:
+                    self.buy_size[i] = self.broker.get_value() * (1.0 / self.params.max_stock_num) / data.close[0]
+
+                # buy_size = self.broker.get_value() * 0.05 / data.close[0]
+
+                # buy size  1/50 of the total account value
+                buy_size = self.buy_size[i]
+
+                self.buy(data, size=buy_size)
+                self.stop_loss[i] = data.close[0] - self.atr[i][0] * self.params.atr_multiplier
+                self.logger.info(f"BUY {data._name} at {data.close[0]}, stop loss at {self.stop_loss[i]}")
+            elif cci_signal == -1 or rsi_signal == -1:
+                if self.getposition(data).size <= 0:
+                    continue
+                self.sell(data, size=self.getposition(data).size)
+                self.stop_loss[i] = 999999
+                self.buy_size[i] = 0
+            elif data.close[0] < self.stop_loss[i] or data.close[0] < self.high[i][0] - self.atr[i][0] * 40:
+                if self.getposition(data).size <= 0:
+                    continue
+                self.sell(data, size=self.getposition(data).size)
+                self.buy_size[i] = 0
+                self.logger.info(f"stop loss triggered, SELL {data._name} at {data.close[0]} < stop loss : {self.stop_loss[i]}")
+                self.stop_loss[i] = 999999
+            
+            self.stop_loss[i] = max(self.stop_loss[i], data.close[0] - self.atr[i][0] * self.params.atr_multiplier)
         
+        self.query_holding_number()

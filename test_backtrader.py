@@ -55,7 +55,9 @@ def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100
     # Add analyzers
     cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='mysharpe', riskfreerate=0.0)
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
-    cerebro.addanalyzer(bt.analyzers.Returns)
+    cerebro.addanalyzer(bt.analyzers.AnnualReturn, _name='AnnualReturn')
+    cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')
+
 
     # Run over everything
     results = cerebro.run()
@@ -66,10 +68,13 @@ def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100
     print('Sharpe Ratio:', results[0].analyzers.mysharpe.get_analysis())
     print('max Draw Down:', results[0].analyzers.drawdown.get_analysis()['max'])
     print('return:', results[0].analyzers.returns.get_analysis()['rnorm100'])
+    print('Annual Return:', results[0].analyzers.AnnualReturn.get_analysis())
+
 
     
     # Print the profit
     profit = cerebro.broker.getvalue() - cash
+    print(f"Profit: {profit}")
 
     # Visulize the result
     if visual_data:
@@ -133,9 +138,9 @@ def demo_of_simple_strategy():
     data_root = "data"
     # data_root = "data_train"
     test_all_data = True
-    from_date = datetime.datetime(2022, 1, 5)
+    from_date = datetime.datetime(2020, 1, 5)
     to_date = datetime.datetime(2024, 1, 30)
-    cash = 10000
+    cash = 100000
 
     visual_data_one_by_one = False
 
@@ -181,13 +186,14 @@ def demo_of_simple_strategy():
         # PriceMomumentStrategy,
         # InvertPriceMomumentStrategy,
         # PriceMomumentStrategyForUS,
-        EMATrendStrategy, # good for long trend, right side trader 
+        # EMATrendStrategy, # good for long trend, right side trader 
         # LongLowerShadowCandlestickStrategy,
         # DiffStrategy,
         # XGBoostStrategy,
         # TurtleTradingStrategy,
         # GridTradingStrategy,
         # GridTradingWithTimingStrategy,
+        GroupInvertStrategy,
     ]
 
     if visual_data_one_by_one:
