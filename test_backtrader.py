@@ -3,6 +3,9 @@ import datetime
 import random
 import pandas as pd
 
+import pyfolio as pf
+
+
 import os
 
 from backtrader_strategy import *
@@ -57,6 +60,7 @@ def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
     cerebro.addanalyzer(bt.analyzers.AnnualReturn, _name='AnnualReturn')
     cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')
+    cerebro.addanalyzer(bt.analyzers.PyFolio, _name='pyfolio')
 
 
     # Run over everything
@@ -70,6 +74,11 @@ def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100
     print('return:', results[0].analyzers.returns.get_analysis()['rnorm100'])
     print('Annual Return:', results[0].analyzers.AnnualReturn.get_analysis())
 
+    pyfoliozer = results[0].analyzers.getbyname('pyfolio')
+    returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
+    pf.create_full_tear_sheet(returns, positions=positions, transactions=transactions)
+    print(f"returens: {returns}")
+    print(f"positions:{positions}")
 
     
     # Print the profit
@@ -135,10 +144,10 @@ def demo_of_ShortTermReversalEffectinStocks():
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    data_root = "data"
+    data_root = "data_hour"
     # data_root = "data_train"
     test_all_data = True
-    from_date = datetime.datetime(2020, 1, 5)
+    from_date = datetime.datetime(2022, 1, 5)
     to_date = datetime.datetime(2024, 1, 30)
     cash = 100000
 
