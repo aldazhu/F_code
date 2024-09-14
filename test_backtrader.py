@@ -76,10 +76,22 @@ def test_backtrader(datas, strategies, cash=100000.0, commission=0.001,stake=100
 
     pyfoliozer = results[0].analyzers.getbyname('pyfolio')
     returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
-    pf.create_full_tear_sheet(returns, positions=positions, transactions=transactions)
-    print(f"returens: {returns}")
-    print(f"positions:{positions}")
+    # returns.index = pd.to_datetime(returns.index) # make the index a datetime
+    # returns.index.rename('index_date', inplace=True)
+    # transactions.index.rename('index_date', inplace=True)
+    # transactions.rename(columns={'date':'column_date'}, inplace=True)
+    # positions.index.rename('index_date', inplace=True)
+    # print(f"returens: {returns}")
+    # print(f"positions:{positions}")
+    
+    pf.create_full_tear_sheet(returns, positions=positions, transactions=transactions,estimate_intraday=False)
+    
+    # # 保存图像
+    # plt.savefig('tear_sheet.png')
 
+    # # 关闭图像
+    # plt.close()
+    # plt.show()
     
     # Print the profit
     profit = cerebro.broker.getvalue() - cash
@@ -144,10 +156,10 @@ def demo_of_ShortTermReversalEffectinStocks():
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    data_root = "data_hour"
+    data_root = "data"
     # data_root = "data_train"
     test_all_data = True
-    from_date = datetime.datetime(2022, 1, 5)
+    from_date = datetime.datetime(2020, 1, 5)
     to_date = datetime.datetime(2024, 1, 30)
     cash = 100000
 
