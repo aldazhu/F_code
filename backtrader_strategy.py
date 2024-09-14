@@ -1871,7 +1871,7 @@ class KalmanFilterStrategy(StragegyTemplate):
                 if self.getposition(data).size > 0:
                     self.sell(data, size=self.getposition(data).size)
                     self.pre_trade_price[i] = -1
-            elif data.close[0] < self.pre_trade_price[i] - 0.5 * self.atr[i][0] :
+            elif data.close[0] < self.pre_trade_price[i] - 1.0 * self.atr[i][0] :
                 if self.getposition(data).size > 0:
                     self.sell(data, size=self.getposition(data).size)
                     self.pre_trade_price[i] = -1
