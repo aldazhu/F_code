@@ -1825,6 +1825,7 @@ class KalmanFilterStrategy(StragegyTemplate):
         for i, data in enumerate(self.datas):
             self.kalman_filter.append(KalmanFilter(x, F, H))
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.atr.append(bt.indicators.ATR(data, period=14))
 
     def get_observation_10(self, data_index):
         data = self.datas[data_index]
@@ -1845,14 +1846,34 @@ class KalmanFilterStrategy(StragegyTemplate):
             # x = [open, high, low, close, volume, open_diff, high_v, low_v, close_v, volume_v]
             # z = self.get_observation_10(i)
             z = self.get_observation_3(i)
-            self.kalman_filter[i].predict()
+            
+            # Predict the next 10 days
+            predictions = []
+            for _ in range(5):
+                self.kalman_filter[i].predict()
+                predictions.append(self.kalman_filter[i].x[0])
+            
+            # Update the Kalman filter with the current observation
             self.kalman_filter[i].update(z)
-            # print(f"z: {z}, kalman_filter: {self.kalman_filter[i].x}")
-            if self.kalman_filter[i].x[0] > self.ema[i][0]:
+            
+            # Use the average of the predictions as the prediction for the next 10 days
+            prediction = (predictions[-1] - predictions[0])/ predictions[0]
+
+            account_value = self.broker.get_value() * (1.0 / self.params.max_stock_num)
+            buy_size = (account_value / data.close[0] // 100) * 100
+            
+            if prediction > 0.01:
                 if self.getposition(data).size <= 0:
-                    self.buy(data)
-            else:
+                    self.buy(data, size=buy_size)
+                    self.pre_trade_price[i] = data.close[0]
+            elif prediction < -0.02:
                 if self.getposition(data).size > 0:
-                    self.sell(data)
+                    self.sell(data, size=self.getposition(data).size)
+                    self.pre_trade_price[i] = -1
+            elif data.close[0] < self.pre_trade_price[i] - 0.5 * self.atr[i][0]:
+                if self.getposition(data).size > 0:
+                    self.sell(data, size=self.getposition(data).size)
+                    self.pre_trade_price[i] = -1
+
 
         self.query_holding_number()
