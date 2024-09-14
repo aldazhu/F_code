@@ -818,7 +818,8 @@ class NewLowStrategy(StragegyTemplate):
         ('highest_window', 15),
         ('lowest_window', 50),
         ('ema_period', 5),
-        ('ema_sell_period', 10)
+        ('ema_sell_period', 10),
+        ('max_stock_num', 50)
     )
 
     def __init__(self):
@@ -845,14 +846,17 @@ class NewLowStrategy(StragegyTemplate):
             if self.getposition(data).size <= 0 :
                 if self.low[i][0] < self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
-                    self.order = self.buy(data)
+                    buy_amount = self.broker.get_value() / self.params.max_stock_num
+                    buy_size = int(buy_amount / data.close[0] / 100) * 100
+                    self.order = self.buy(data, size=buy_size)
                     self.stop_loss[i] = data.close[0] - self.atr[i][0] * 2
             else:
                 # hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
-                if data.close[0] > self.high[i][-1] :
+                if data.close[0] > self.high[i][-1] or data.close[0] < self.stop_loss[i]:
                     print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
                     self.order = self.sell(data)
                     self.stop_loss[i] = 999999
+                    
         self.query_holding_number()
         # stop loss
         # self.stop_loss_watch_dog()
@@ -1688,4 +1692,167 @@ class GroupInvertStrategy(StragegyTemplate):
             else:
                 self.stop_loss[i] = max(self.stop_loss[i], data.close[-1] - self.atr[i][0] * self.params.atr_multiplier)
         
+        self.query_holding_number()
+
+
+class KalmanFilter:
+    def __init__(self, x, F, H, Q=None, R=None, P=None):
+        """
+        Initialize the Kalman Filter.
+        
+        Parameters:
+        x : Initial state estimate
+        F : State transition matrix
+        H : Observation matrix
+        Q : Process noise covariance matrix
+        R : Observation noise covariance matrix
+        P : Estimate error covariance matrix
+        
+        """
+        self.n = x.shape[0]  # Dimension of the state vector
+        self.m = H.shape[0]  # Dimension of the observation vector
+        
+        self.F = F 
+        self.H = H 
+        self.Q = Q if Q is not None else np.eye(self.n)
+        self.R = R if R is not None else np.eye(self.m)*10
+        self.P = P if P is not None else np.eye(self.n)*100 # Initial state covariance
+        self.x = x
+
+        print(f"self.F: {self.F}, self.H: {self.H}, self.Q: {self.Q}, self.R: {self.R}, self.P: {self.P}, self.x: {self.x}")
+        print(f"F.shape: {self.F.shape}, H.shape: {self.H.shape}, Q.shape: {self.Q.shape}, R.shape: {self.R.shape}, P.shape: {self.P.shape}, x.shape: {self.x.shape}")
+        
+    def predict(self):
+        """
+        Perform the predict step.
+        """
+        self.x = np.dot(self.F, self.x)
+        self.P = np.dot(np.dot(self.F, self.P), self.F.T) + self.Q
+
+    def update(self, z):
+        """
+        Perform the update step.
+        
+        Parameters:
+        z : Observation value
+        """
+        y = z - np.dot(self.H, self.x)
+        S = np.dot(self.H, np.dot(self.P, self.H.T)) + self.R
+        # if np.linalg.det(S) == 0:
+        #     return
+        
+        # print(f"self.H: {self.H}, self.P: {self.P}, self.H.T: {self.H.T}, self.R: {self.R}")
+        # print(f"S: {S}")
+        K = np.dot(np.dot(self.P, self.H.T), np.linalg.inv(S))
+        self.x = self.x + np.dot(K, y)
+        I = np.eye(self.n)
+        temp = I - np.dot(K, self.H)
+        self.P = np.dot(temp, self.P).dot(temp.T) + np.dot(K, self.R).dot(K.T)
+
+    def set_state(self, new_x):
+        """
+        Set a new state estimate.
+        
+        Parameters:
+        new_x : New state vector
+        """
+        self.x = new_x
+
+    def set_covariance(self, new_P):
+        """
+        Set a new state estimate covariance.
+        
+        Parameters:
+        new_P : New covariance matrix
+        """
+        self.P = new_P
+
+class KalmanFilterStrategy(StragegyTemplate):
+    params = (
+        ('ema_period', 30),
+        ('k_atr', 2),
+        ('max_stock_num', 50),
+        )
+
+    def __init__(self):
+        super().__init__()
+        self.ema = []
+        self.ema_long = []
+        self.atr = []
+        self.max_price = []
+        self.min_price = []
+        self.break_price = []
+        self.unit = []
+        self.atr_stop = []
+        self.pre_trade_price = [-1 for i in range(len(self.datas))]
+        self.kalman_filter = []
+
+        # x = [open, high, low, close, volume, open_diff, high_v, low_v, close_v, volume_v]
+        # F = np.array([
+        #     [1, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+        #     [0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+        #     [0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+        #     [0, 0, 0, 1, 0, 0, 0, 0, 1, 0],
+        #     [0, 0, 0, 0, 1, 0, 0, 0, 0, 1], #
+        #     [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+        #     [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+        #     [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+        #     [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+        #     [0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            
+        #     ])
+        # H = np.array([
+        #     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        #     [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+        #     [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+        #     [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+        #     [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+        # ])
+        
+        # x = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+
+        # x = [ema, ema_v, ema_a]
+        # ema_y = ema + ema_v * dt + 0.5 * ema_a * dt * dt 
+        F = np.array([
+            [1, 1, 0.5],
+            [0, 1, 1],
+            [0, 0, 1],
+        ])
+        x = np.array([[0], [0], [0]])
+        H = np.array([[1, 0, 0]])
+        
+
+        for i, data in enumerate(self.datas):
+            self.kalman_filter.append(KalmanFilter(x, F, H))
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+
+    def get_observation_10(self, data_index):
+        data = self.datas[data_index]
+        x = np.array([data.open[0], data.high[0], data.low[0], data.close[0], data.volume[0], 
+            data.open[0] - data.open[-1], data.high[0] - data.high[-1], data.low[0] - data.low[-1], data.close[0] - data.close[-1], data.volume[0] - data.volume[-1]])
+        return x
+    
+    def get_observation_3(self, data_index):
+        
+        z = self.ema[data_index][0]
+        return z
+
+    def next(self):
+        if self.order:
+            return
+
+        for i, data in enumerate(self.datas):
+            # x = [open, high, low, close, volume, open_diff, high_v, low_v, close_v, volume_v]
+            # z = self.get_observation_10(i)
+            z = self.get_observation_3(i)
+            self.kalman_filter[i].predict()
+            self.kalman_filter[i].update(z)
+            # print(f"z: {z}, kalman_filter: {self.kalman_filter[i].x}")
+            if self.kalman_filter[i].x[0] > self.ema[i][0]:
+                if self.getposition(data).size <= 0:
+                    self.buy(data)
+            else:
+                if self.getposition(data).size > 0:
+                    self.sell(data)
+
         self.query_holding_number()
