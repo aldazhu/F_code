@@ -1769,7 +1769,7 @@ class KalmanFilter:
 
 class KalmanFilterStrategy(StragegyTemplate):
     params = (
-        ('ema_period', 30),
+        ('ema_period', 15),
         ('k_atr', 2),
         ('max_stock_num', 50),
         )
@@ -1826,6 +1826,7 @@ class KalmanFilterStrategy(StragegyTemplate):
             self.kalman_filter.append(KalmanFilter(x, F, H))
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
             self.atr.append(bt.indicators.ATR(data, period=14))
+            self.max_price.append(bt.indicators.Highest(data.high, period=20))
 
     def get_observation_10(self, data_index):
         data = self.datas[data_index]
@@ -1862,15 +1863,15 @@ class KalmanFilterStrategy(StragegyTemplate):
             account_value = self.broker.get_value() * (1.0 / self.params.max_stock_num)
             buy_size = (account_value / data.close[0] // 100) * 100
             
-            if prediction > 0.01:
+            if prediction > 0.008:
                 if self.getposition(data).size <= 0:
                     self.buy(data, size=buy_size)
                     self.pre_trade_price[i] = data.close[0]
-            elif prediction < -0.02:
+            elif prediction < -0.01:
                 if self.getposition(data).size > 0:
                     self.sell(data, size=self.getposition(data).size)
                     self.pre_trade_price[i] = -1
-            elif data.close[0] < self.pre_trade_price[i] - 0.5 * self.atr[i][0]:
+            elif data.close[0] < self.pre_trade_price[i] - 0.5 * self.atr[i][0] :
                 if self.getposition(data).size > 0:
                     self.sell(data, size=self.getposition(data).size)
                     self.pre_trade_price[i] = -1
