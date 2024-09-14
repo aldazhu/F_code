@@ -274,6 +274,9 @@ class StragegyTemplate(bt.Strategy):
 
     def query_holding_number(self):
         holding_number = len(self.hold_pool.pool)
+        account_value = self.broker.get_value()
+        self.change_percent = (account_value - self.broker.startingcash) / self.broker.startingcash
+        self.logger.info("account value: %s, change percent: %s", account_value, self.change_percent)
         self.logger.info("Holding number: %s" % holding_number)
 
     def stop_loss_watch_dog(self):
@@ -1470,10 +1473,11 @@ class TurtleTradingStrategy(StragegyTemplate):
     params = (
         ('ema_period', 20),
         ('ema_long_period', 50),
-        ('atr_period', 20),
-        ('high_period', 50),
-        ('low_period', 10),
+        ('atr_period', 14),
+        ('high_period', 60),
+        ('low_period', 20),
         ('k_atr', 2),
+        ('max_stock_num', 50),
         )
 
     def __init__(self):
@@ -1486,16 +1490,15 @@ class TurtleTradingStrategy(StragegyTemplate):
         self.break_price = []
         self.unit = []
         self.atr_stop = []
-        
+        self.pre_trade_price = [-1 for i in range(len(self.datas))]
         
         for i, data in enumerate(self.datas):
-            # self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
             self.ema_long.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_long_period))
             self.atr.append(bt.indicators.ATR(data, period=self.params.atr_period))
             self.max_price.append(bt.indicators.Highest(data.high, period=self.params.high_period))
             self.min_price.append(bt.indicators.Lowest(data.low, period=self.params.low_period))
-            self.atr_stop.append(AverageTrueRangeStop(data, atr_period=self.params.atr_period, multiplier=self.params.k_atr))
-            self.unit.append(0)
+            self.atr_stop.append(AverageTrueRangeStop(data, atr_period=self.params.atr_period, multiplier=self.params.k_atr, price_type='close'))
             
 
     def next(self):
@@ -1503,22 +1506,30 @@ class TurtleTradingStrategy(StragegyTemplate):
             return
 
         for i, data in enumerate(self.datas):
-            if data.close[0] >= self.max_price[i][-1] :
-                account_value = self.broker.get_value()
-                if self.unit[i] == 0:
-                    # first time to buy
-                    unit = self.broker.get_value() * 0.01 / data.close[0] 
+            if data.close[0] >= self.max_price[i][-1] and self.ema[i][-1] > self.ema_long[i][-1] and self.ema_long[i][-1] > self.ema_long[i][-2]:
+                account_value = self.broker.get_value() * (1.0 / self.params.max_stock_num)
+                buy_size = (account_value / data.close[0] // 100) * 100
+                
+                if buy_size < 100:
+                    buy_size = 100
+
+                if self.getposition(data).size <= 0:
+                    self.logger.info(f"{data.datetime.date(0)}: name : {data._name} buy , today close at {data.close[0]}   buy_size: {buy_size}")
+                    self.order = self.buy(data, size=buy_size)
+                    self.pre_trade_price[i] = data.close[0]
                 else:
-                    unit = self.unit[i] / 2
-                if unit < 1:
-                    unit = 1
-                self.logger.info(f"{data.datetime.date(0)}: name : {data._name} buy , today close at {data.close[0]}   unit: {unit}")
-                self.order = self.buy(data, size=unit)
-            elif data.close[0] < self.max_price[i][0] - (self.params.k_atr * self.atr[i][0]) :
+                    # the stock has been bought ,concider to add more
+                    if data.close[0] > self.pre_trade_price[i] + 0.5 * self.atr[i][0]:
+                        self.logger.info(f"{data.datetime.date(0)}: name : {data._name} add more , today close at {data.close[0]}   buy_size: {buy_size}")
+                        self.order = self.buy(data, size=buy_size)
+                        self.pre_trade_price[i] = data.close[0]
+
+            elif data.close[0] < self.pre_trade_price[i] - (self.params.k_atr * self.atr[i][0]) :
                 sell_size = self.getposition(data).size
                 self.order = self.sell(data, size=sell_size)
-                self.unit[i] = 0
-        
+                self.pre_trade_price[i] = -1
+                self.logger.info(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}   sell_size: {sell_size}")
+                
         self.query_holding_number()
 
 class GridTradingStrategy(StragegyTemplate):
@@ -1579,7 +1590,7 @@ class GroupInvertStrategy(StragegyTemplate):
         ('ema_period', 30),
         ('ema_threshold', 0.1),
         ('atr_period', 14),
-        ('atr_multiplier', 1.5), # stop loss threshold
+        ('atr_multiplier', 2), # stop loss threshold
         ('max_stock_num', 50),
         
     )
@@ -1647,7 +1658,8 @@ class GroupInvertStrategy(StragegyTemplate):
             rsi_signal = self.get_rsi_signal(i)
             if cci_signal == 1 or rsi_signal == 1 :
                 if self.getposition(data).size > 0 and self.buy_size[i] > 0:
-                    self.buy_size[i] = self.buy_size[i] / 2 # half the size
+                    self.buy_size[i] = self.buy_size[i]  # half the size
+                    # self.buy_size[i] = 0
                 else:
                     self.buy_size[i] = self.broker.get_value() * (1.0 / self.params.max_stock_num) / data.close[0]
 
@@ -1665,7 +1677,7 @@ class GroupInvertStrategy(StragegyTemplate):
                 self.sell(data, size=self.getposition(data).size)
                 self.stop_loss[i] = 999999
                 self.buy_size[i] = 0
-            elif data.close[0] < self.stop_loss[i] or data.close[0] < self.high[i][0] - self.atr[i][0] * 40:
+            elif data.close[0] < self.stop_loss[i] or data.close[0] < self.high[i][0] - self.atr[i][0] * 4:
                 if self.getposition(data).size <= 0:
                     continue
                 self.sell(data, size=self.getposition(data).size)
@@ -1673,6 +1685,7 @@ class GroupInvertStrategy(StragegyTemplate):
                 self.logger.info(f"stop loss triggered, SELL {data._name} at {data.close[0]} < stop loss : {self.stop_loss[i]}")
                 self.stop_loss[i] = 999999
             
-            self.stop_loss[i] = max(self.stop_loss[i], data.close[0] - self.atr[i][0] * self.params.atr_multiplier)
+            else:
+                self.stop_loss[i] = max(self.stop_loss[i], data.close[-1] - self.atr[i][0] * self.params.atr_multiplier)
         
         self.query_holding_number()
