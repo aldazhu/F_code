@@ -3,10 +3,13 @@ import backtrader.feeds as btfeeds
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import stats
 
 import backtrader.talib as ta
 from backtrader_indicator import RSRS, RSRS_Norm, Diff, AverageTrueRangeStop, ATRNormalized, SafeCCI
 from my_logger import logger
+
+
 
 
 from xgboost import XGBClassifier, XGBRegressor
@@ -1714,8 +1717,8 @@ class KalmanFilter:
         
         self.F = F 
         self.H = H 
-        self.Q = Q if Q is not None else np.eye(self.n)
-        self.R = R if R is not None else np.eye(self.m)*10
+        self.Q = Q if Q is not None else np.eye(self.n) # Process noise covariance
+        self.R = R if R is not None else np.eye(self.m)*10 # Observation noise covariance
         self.P = P if P is not None else np.eye(self.n)*100 # Initial state covariance
         self.x = x
 
@@ -1821,12 +1824,22 @@ class KalmanFilterStrategy(StragegyTemplate):
         x = np.array([[0], [0], [0]])
         H = np.array([[1, 0, 0]])
         
+        # dict_t = {"pred":[],
+        #           "truth":[]}
+        self.predict_state = []
 
         for i, data in enumerate(self.datas):
-            self.kalman_filter.append(KalmanFilter(x, F, H))
+            Q = np.eye(3) * 0.1 # Process noise covariance
+            R = np.eye(1) * 1 # Observation noise covariance
+            P = np.eye(3) * self.datas[i].close[0] # Initial state covariance
+
+            self.kalman_filter.append(KalmanFilter(x, F, H, Q, R, P))
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
             self.atr.append(bt.indicators.ATR(data, period=14))
             self.max_price.append(bt.indicators.Highest(data.high, period=20))
+            # Create a new dictionary for each element
+            dict_t = {'pred': [], 'truth': []}
+            self.predict_state.append(dict_t)
 
     def get_observation_10(self, data_index):
         data = self.datas[data_index]
@@ -1838,6 +1851,24 @@ class KalmanFilterStrategy(StragegyTemplate):
         
         z = self.ema[data_index][0]
         return z
+    
+    # def stop(self):
+    #     pass
+    #     for i in range(len(self.predict_state)):
+    #         # x = np.arange(len(self.predict_state[i]['truth']))
+    #         y_pred = [float(y) for y in self.predict_state[i]['pred']]
+    #         y_truth = self.predict_state[i]['truth']
+    #         y_pred = y_pred[10:-10]
+    #         y_truth = y_truth[10:-10]
+    #         x = np.arange(len(y_pred))
+    #         x_truth = np.arange(10, len(y_pred) + 10)
+    #         x_pred = np.arange(len(y_truth))
+    #         print(f'y_pred: {y_pred[-10:]}')
+    #         print(f'y_truth: {y_truth[-10:]}')
+    #         plt.plot(x_pred, y_pred, c='r', label='pred')
+    #         plt.plot(x_truth, y_truth, c='b', label='truth')
+    #         plt.legend()
+    #         plt.show()
 
     def next(self):
         if self.order:
@@ -1847,16 +1878,27 @@ class KalmanFilterStrategy(StragegyTemplate):
             # x = [open, high, low, close, volume, open_diff, high_v, low_v, close_v, volume_v]
             # z = self.get_observation_10(i)
             z = self.get_observation_3(i)
+            try:
+                self.predict_state[i]['truth'].append(self.ema[i][10])
+            except:
+                print("except:")
+                self.predict_state[i]['truth'].append(0)
+
+            # Update the Kalman filter with the current observation
+            self.kalman_filter[i].update(z)
             
             # Predict the next 10 days
             predictions = []
             for _ in range(5):
                 self.kalman_filter[i].predict()
                 predictions.append(self.kalman_filter[i].x[0])
+
+            self.predict_state[i]['pred'].append(predictions[-1][0])
+            # print(f"data_index: {i} z: {self.predict_state[i]['truth'][-1]}, predict: {self.predict_state[i]['pred'][-1]}")
+            # print(f"self.kalman_filter[{i}].x: {self.kalman_filter[i].x}")
+            # input("press any key to continue")
             
-            # Update the Kalman filter with the current observation
-            self.kalman_filter[i].update(z)
-            
+                        
             # Use the average of the predictions as the prediction for the next 10 days
             prediction = (predictions[-1] - predictions[0])/ predictions[0]
 
@@ -1878,3 +1920,96 @@ class KalmanFilterStrategy(StragegyTemplate):
 
 
         self.query_holding_number()
+
+class LinearRegressionStrategy(StragegyTemplate):
+    params = (
+        ('ema_period', 30),
+        ('k_atr', 2),
+        ('pre_days', 30),
+        ('max_stock_num', 10),
+        )
+
+    def __init__(self):
+        super().__init__()
+        self.ema = []
+        self.atr = []
+
+        self.pre_trade_price = [-1 for i in range(len(self.datas))]
+
+        self.current_day_count = 0
+        
+        for i , data in enumerate(self.datas):
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.atr.append(bt.indicators.ATR(data, period=14))
+
+    def get_observation(self, data_index):
+        data = self.datas[data_index]
+        prices = []
+        for i in range(self.params.pre_days):
+            index = i + (0 - self.params.pre_days) + 1 # if pre_days is 10 , then index: -9, -8, -7, -6, -5, -4, -3, -2, -1, 0
+            # price = (data.close[index] + data.high[index] + data.low[index] + data.open[index]) / 4.0
+            price = data.close[index]
+            prices.append(price)
+        prices = [p/prices[0] for p in prices]
+        return prices
+    
+    def linear_regression(self,prices):
+        x = np.arange(len(prices))
+        y = np.array(prices)
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+        weight = slope * r_value *r_value / std_err
+        # print(f"slope: {slope}, intercept: {intercept}, r_value: {r_value}, p_value: {p_value}, std_err: {std_err}")
+        # print(f"weight: {weight}")
+        # plt.scatter(x, y)
+        # plt.plot(x, slope*x + intercept, c='r')
+        # plt.show()
+        return slope, intercept, r_value, p_value, std_err
+
+    def next(self):
+        if self.order:
+            return
+        
+        self.current_day_count += 1
+        if self.current_day_count < self.params.pre_days:
+            return
+
+        weights = [] # (data_index, weight)
+        for i, data in enumerate(self.datas):
+            prices = self.get_observation(i)
+            slope, intercept, r_value, p_value, std_err = self.linear_regression(prices)
+            # slope up, r_value up, std_err down, weight up
+            weight = slope * r_value * r_value / std_err
+            weights.append((i, weight))
+
+        weights = sorted(weights, key=lambda x: x[1], reverse=True) # sort by weight high to low
+        # weights = sorted(weights, key=lambda x: x[1]) # sort by weight, low to high
+        
+        max_selected_stock_num = min(self.params.max_stock_num,len(self.datas))
+        for i in range(max_selected_stock_num):
+            data_index = weights[i][0]
+            weight = weights[i][1]
+            data = self.datas[data_index]
+            account_value = self.broker.get_value() * (1.0 / self.params.max_stock_num)
+            buy_size = (account_value / data.close[0] // 100) * 100
+            
+            if self.getposition(data).size <= 0 and weight > 0.5:
+                self.buy(data, size=buy_size)
+                self.pre_trade_price[data_index] = data.close[0]
+            
+        selected_data_index = [weights[i][0] for i in range(max_selected_stock_num)]
+        for i in range(len(self.datas)):
+            if i not in selected_data_index:
+                data = self.datas[i]
+                if self.getposition(data).size > 0:
+                    self.sell(data, size=self.getposition(data).size)
+                    self.pre_trade_price[i] = -1
+            elif data.close[0] < self.pre_trade_price[i] - 1.0 * self.atr[i][0] :
+                if self.getposition(data).size > 0:
+                    self.sell(data, size=self.getposition(data).size)
+                    self.pre_trade_price[i] = -1
+
+            
+            
+            
+                
+        

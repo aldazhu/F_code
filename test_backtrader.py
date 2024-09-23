@@ -166,10 +166,10 @@ def demo_of_simple_strategy():
     visual_data_one_by_one = False
 
     data_names = [
-        f'{data_root}/sz.300628.csv',
-        f'{data_root}/sz.300979.csv',
-        f'{data_root}/sh.600000.csv',
-        f'{data_root}/sh.600089.csv',
+        # f'{data_root}/sz.300628.csv',
+        # f'{data_root}/sz.300979.csv',
+        # f'{data_root}/sh.600000.csv',
+        # f'{data_root}/sh.600089.csv',
        
     ]
 
@@ -214,7 +214,9 @@ def demo_of_simple_strategy():
         # TurtleTradingStrategy,
         # GridTradingStrategy,
         # GridTradingWithTimingStrategy,
-        GroupInvertStrategy,
+        # GroupInvertStrategy,
+        # KalmanFilterStrategy,
+        LinearRegressionStrategy,
     ]
 
     if visual_data_one_by_one:
@@ -223,6 +225,9 @@ def demo_of_simple_strategy():
             print(f"Processing {data._name} ...")
             test_backtrader([data], strategies=strategies, cash=cash, commission=0.001, stake=stake, visual_data=True)
     else:
+        # shuffle 
+        random.shuffle(datas)
+
         test_backtrader(datas, strategies=strategies, cash=cash, commission=0.001, stake=stake)
 
 
