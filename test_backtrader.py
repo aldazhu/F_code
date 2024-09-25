@@ -22,7 +22,11 @@ def get_valid_files(data_root, start_date, end_date):
         date_key = 'date'
         if date_key not in df.columns and 'Date' in df.columns:
             date_key = 'Date'
+
+        if "日期" in df.columns:
+            date_key = "日期"
             
+        print(f"file: {file}, date_key: {date_key}")
         df[date_key] = pd.to_datetime(df[date_key])
         print(f"Processing {file}, min date: {df[date_key].min()}, max date: {df[date_key].max()}")
         if df[date_key].min() <= start_date :
@@ -114,6 +118,16 @@ def get_data(data_name, from_date, to_date):
                 todate=to_date)
     return data
 
+def get_akshare_etf_data(data_name, from_date, to_date):
+    if not os.path.exists(data_name):
+        print(f"Data file {data_name} does not exist.")
+        raise "Data file does not exist."
+
+    data = MyAKShareETFData(dataname=data_name,
+                fromdate=from_date,
+                todate=to_date)
+    return data
+
 def get_minutely_data(data_name, from_date, to_date):
     if not os.path.exists(data_name):
         print(f"Data file {data_name} does not exist.")
@@ -156,20 +170,23 @@ def demo_of_ShortTermReversalEffectinStocks():
 
 def demo_of_simple_strategy():
     # Create a Data Feed
-    data_root = "data"
+    data_root = "data_etf"
+    index_file = "data_index/sh.000300.csv"
     # data_root = "data_train"
     test_all_data = True
-    from_date = datetime.datetime(2020, 1, 5)
+    from_date = datetime.datetime(2010, 1, 5)
     to_date = datetime.datetime(2024, 1, 30)
     cash = 100000
 
     visual_data_one_by_one = False
+    with_index = True
 
     data_names = [
         # f'{data_root}/sz.300628.csv',
         # f'{data_root}/sz.300979.csv',
         # f'{data_root}/sh.600000.csv',
         # f'{data_root}/sh.600089.csv',
+        f'{data_root}/510300.csv',
        
     ]
 
@@ -188,10 +205,13 @@ def demo_of_simple_strategy():
         datas = [get_minutely_data(data_name, from_date, to_date) for data_name in data_names]
     elif "us" in data_names[0]:
         datas = [get_sea_data(data_name, from_date, to_date) for data_name in data_names]
+    elif "etf" in data_names[0]:
+        datas = [get_akshare_etf_data(data_name, from_date, to_date) for data_name in data_names]
     else:
         datas = [get_data(data_name, from_date, to_date) for data_name in data_names]
 
     stake = 1
+
 
     strategies = [
         # NewHighStrategy ,# ok
@@ -211,12 +231,13 @@ def demo_of_simple_strategy():
         # LongLowerShadowCandlestickStrategy,
         # DiffStrategy,
         # XGBoostStrategy,
-        # TurtleTradingStrategy,
+        TurtleTradingStrategy,
         # GridTradingStrategy,
         # GridTradingWithTimingStrategy,
         # GroupInvertStrategy,
         # KalmanFilterStrategy,
-        LinearRegressionStrategy,
+        # KalmanFilterStrategyRank,
+        # LinearRegressionStrategy,
     ]
 
     if visual_data_one_by_one:
@@ -227,6 +248,9 @@ def demo_of_simple_strategy():
     else:
         # shuffle 
         random.shuffle(datas)
+        if with_index:
+            index_data = get_data(index_file, from_date, to_date)
+            datas.insert(0, index_data)
 
         test_backtrader(datas, strategies=strategies, cash=cash, commission=0.001, stake=stake)
 

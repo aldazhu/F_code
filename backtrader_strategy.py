@@ -1513,6 +1513,9 @@ class TurtleTradingStrategy(StragegyTemplate):
         self.unit = []
         self.atr_stop = []
         self.pre_trade_price = [-1 for i in range(len(self.datas))]
+
+        self.with_index = False
+        self.stock_index_id = 0
         
         for i, data in enumerate(self.datas):
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
@@ -1554,6 +1557,8 @@ class TurtleTradingStrategy(StragegyTemplate):
 
             elif data.close[0] < self.pre_trade_price[i] - (self.params.k_atr * self.atr[i][0]) :
                 sell_size = self.getposition(data).size
+                if sell_size <= 0:
+                    continue
                 self.order = self.sell(data, size=sell_size)
                 self.pre_trade_price[i] = -1
                 self.logger.info(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}   sell_size: {sell_size}")
@@ -1794,6 +1799,7 @@ class KalmanFilter:
 class KalmanFilterStrategy(StragegyTemplate):
     params = (
         ('ema_period', 15),
+        ('ema_long_period', 60),
         ('k_atr', 2),
         ('max_stock_num', 50),
         )
@@ -1849,18 +1855,25 @@ class KalmanFilterStrategy(StragegyTemplate):
         #           "truth":[]}
         self.predict_state = []
 
+        self.with_index = False
+        self.stock_index_id = -1
+
         for i, data in enumerate(self.datas):
-            Q = np.eye(3) * 0.1 # Process noise covariance
-            R = np.eye(1) * 1 # Observation noise covariance
+            Q = np.eye(3) * 0.01 # Process noise covariance
+            R = np.eye(1) * 0.1 # Observation noise covariance
             P = np.eye(3) * self.datas[i].close[0] # Initial state covariance
 
             self.kalman_filter.append(KalmanFilter(x, F, H, Q, R, P))
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema_long.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_long_period))
             self.atr.append(bt.indicators.ATR(data, period=14))
             self.max_price.append(bt.indicators.Highest(data.high, period=20))
             # Create a new dictionary for each element
             dict_t = {'pred': [], 'truth': []}
             self.predict_state.append(dict_t)
+            if data._name == "000001.SZ" or data._name == "sh.000300":
+                self.with_index = True
+                self.stock_index_id = i
 
     def get_observation_10(self, data_index):
         data = self.datas[data_index]
@@ -1926,7 +1939,11 @@ class KalmanFilterStrategy(StragegyTemplate):
             account_value = self.broker.get_value() * (1.0 / self.params.max_stock_num)
             buy_size = (account_value / data.close[0] // 100) * 100
             
-            if prediction > 0.008:
+            if prediction > 0.008 and data.close[0] > self.ema[i][0]:
+                if self.with_index:
+                    if self.ema[self.stock_index_id][0] < self.ema_long[self.stock_index_id][0]:
+                        continue
+                        
                 if self.getposition(data).size <= 0:
                     self.buy(data, size=buy_size)
                     self.pre_trade_price[i] = data.close[0]
@@ -1942,11 +1959,147 @@ class KalmanFilterStrategy(StragegyTemplate):
 
         self.query_holding_number()
 
-class LinearRegressionStrategy(StragegyTemplate):
+
+class KalmanFilterStrategyRank(StragegyTemplate):
     params = (
         ('ema_period', 30),
+        ('long_ema_period', 60),
         ('k_atr', 2),
-        ('pre_days', 30),
+        ('max_stock_num', 50),
+        ('top_k', 30),
+        )
+
+    def __init__(self):
+        super().__init__()
+        self.ema = []
+        self.ema_long = []
+        self.atr = []
+        self.max_price = []
+        self.min_price = []
+        self.break_price = []
+        self.unit = []
+        self.atr_stop = []
+        self.pre_trade_price = [-1 for i in range(len(self.datas))]
+        self.kalman_filter = []
+
+        # x = [ema, ema_v, ema_a]
+        # ema_y = ema + ema_v * dt + 0.5 * ema_a * dt * dt 
+        F = np.array([
+            [1, 1, 0.5],
+            [0, 1, 1],
+            [0, 0, 1],
+        ])
+        x = np.array([[0], [0], [0]])
+        H = np.array([[1, 0, 0]])
+        
+        # dict_t = {"pred":[],
+        #           "truth":[]}
+        self.predict_state = []
+
+        for i, data in enumerate(self.datas):
+            Q = np.eye(3) * 0.1 # Process noise covariance
+            R = np.eye(1) * 1 # Observation noise covariance
+            P = np.eye(3) * self.datas[i].close[0] # Initial state covariance
+
+            self.kalman_filter.append(KalmanFilter(x, F, H, Q, R, P))
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema_long.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.long_ema_period))
+            self.atr.append(bt.indicators.ATR(data, period=14))
+            self.max_price.append(bt.indicators.Highest(data.high, period=20))
+            # Create a new dictionary for each element
+            dict_t = {'pred': [], 'truth': []}
+            self.predict_state.append(dict_t)
+
+    def get_observation_10(self, data_index):
+        data = self.datas[data_index]
+        x = np.array([data.open[0], data.high[0], data.low[0], data.close[0], data.volume[0], 
+            data.open[0] - data.open[-1], data.high[0] - data.high[-1], data.low[0] - data.low[-1], data.close[0] - data.close[-1], data.volume[0] - data.volume[-1]])
+        return x
+    
+    def get_observation_3(self, data_index):
+        
+        z = self.ema[data_index][0]
+        return z
+    
+    
+    def next(self):
+        if self.order:
+            return
+
+        predictions_per_stock = [] # (data_index, prediction)
+        for i, data in enumerate(self.datas):
+            # x = [open, high, low, close, volume, open_diff, high_v, low_v, close_v, volume_v]
+            # z = self.get_observation_10(i)
+            z = self.get_observation_3(i)
+            try:
+                self.predict_state[i]['truth'].append(self.ema[i][10])
+            except:
+                print("except:")
+                self.predict_state[i]['truth'].append(0)
+
+            # Update the Kalman filter with the current observation
+            self.kalman_filter[i].update(z)
+            
+            # Predict the next 10 days
+            predictions = []
+            for _ in range(10):
+                self.kalman_filter[i].predict()
+                predictions.append(self.kalman_filter[i].x[0])
+
+            self.predict_state[i]['pred'].append(predictions[-1][0])         
+                        
+            # Use the average of the predictions as the prediction for the next 10 days
+            prediction = (predictions[-1] - predictions[0])/ predictions[0]
+
+            predictions_per_stock.append((i, prediction))
+
+        predictions_per_stock = sorted(predictions_per_stock, key=lambda x: x[1], reverse=True) # sort by prediction high to low
+        # predictions_per_stock = sorted(predictions_per_stock, key=lambda x: x[1]) # sort by prediction low to high
+
+        selected_stock_num = min(self.params.top_k, len(self.datas))
+        for i in range(selected_stock_num):
+            data_index = predictions_per_stock[i][0]
+            prediction = predictions_per_stock[i][1]
+            data = self.datas[data_index]
+            account_value = self.broker.get_value() * (1.0 / self.params.max_stock_num)
+            buy_size = (account_value / data.close[0] // 100) * 100
+            
+            if prediction > 0.008 and data.close[0] > self.ema_long[data_index][0]:
+                if self.getposition(data).size <= 0:
+                    self.buy(data, size=buy_size)
+                    self.pre_trade_price[data_index] = data.close[0]
+                # else:
+                #     if data.close[0] > self.pre_trade_price[data_index] + 0.5 * self.atr[data_index][0]:
+                #         self.buy(data, size=buy_size)
+                #         self.pre_trade_price[data_index] = data.close[0]
+            elif prediction < -0.01:
+                if self.getposition(data).size > 0:
+                    self.sell(data, size=self.getposition(data).size)
+                    self.pre_trade_price[data_index] = -1
+            # elif data.close[0] < self.pre_trade_price[data_index] - 1.0 * self.atr[data_index][0] :
+            #     if self.getposition(data).size > 0:
+            #         self.sell(data, size=self.getposition(data).size)
+            #         self.pre_trade_price[data_index] = -1
+
+        selected_data_index = [predictions_per_stock[i][0] for i in range(selected_stock_num)]
+        for i , data in enumerate(self.datas):
+            if i not in selected_data_index:
+                if self.getposition(data).size > 0:
+                    self.sell(data, size=self.getposition(data).size)
+                    self.pre_trade_price[i] = -1
+            # if data.close[0] < self.pre_trade_price[i] - 1.0 * self.atr[i][0] :
+            #     if self.getposition(data).size > 0:
+            #         self.sell(data, size=self.getposition(data).size)
+            #         self.pre_trade_price[i] = -1
+
+        self.query_holding_number()
+
+
+class LinearRegressionStrategy(StragegyTemplate):
+    params = (
+        ('ema_period', 100),
+        ('k_atr', 2),
+        ('pre_days', 15),
         ('max_stock_num', 10),
         )
 
@@ -2013,7 +2166,7 @@ class LinearRegressionStrategy(StragegyTemplate):
             account_value = self.broker.get_value() * (1.0 / self.params.max_stock_num)
             buy_size = (account_value / data.close[0] // 100) * 100
             
-            if self.getposition(data).size <= 0 and weight > 0.5:
+            if self.getposition(data).size <= 0 and weight > 0.5 and data.close[0] > self.ema[data_index][0]:
                 self.buy(data, size=buy_size)
                 self.pre_trade_price[data_index] = data.close[0]
             

@@ -246,7 +246,6 @@ for hz300
 
 
 
-
 ```txt
 2024-08-16 11:31:06,492 - my_logger - INFO - Total count: 675, success count: 475, success rate: 0.7037037037037037
 2024-08-16 11:31:06,492 - my_logger - INFO - mean: 0.0224919307791907, std: 0.097833968848467
@@ -255,6 +254,65 @@ Final Portfolio Value: 999801.19
 Sharpe Ratio: OrderedDict([('sharperatio', -0.1501450230052196)])
 max Draw Down: AutoOrderedDict([('len', 236), ('drawdown', 0.07299242761019854), ('moneydown', 730.3122297455557)])
 return: -0.005045798765825489
+```
+
+### new low with stop loss
+```python
+
+class NewLowStrategy(StragegyTemplate):
+    params = (
+        ('highest_window', 15),
+        ('lowest_window', 50),
+        ('ema_period', 5),
+        ('ema_sell_period', 10),
+        ('max_stock_num', 50)
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.high = []
+        self.low = []
+        self.ema = []
+        self.ema_sell = []
+        self.stop_loss = [999999 for i in range(len(self.datas))]
+        self.atr = []
+        for i, data in enumerate(self.datas):
+            self.high.append(bt.indicators.Highest(data.high, period=self.params.highest_window))
+            self.low.append(bt.indicators.Lowest(data.low, period=self.params.lowest_window))
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema_sell.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_sell_period))
+            self.atr.append(bt.indicators.ATR(data, period=14))
+
+
+    def next(self):
+        if self.order:
+            return
+
+        for i, data in enumerate(self.datas):
+            if self.getposition(data).size <= 0 :
+                if self.low[i][0] < self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
+                    print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
+                    buy_amount = self.broker.get_value() / self.params.max_stock_num
+                    buy_size = int(buy_amount / data.close[0] / 100) * 100
+                    self.order = self.buy(data, size=buy_size)
+                    self.stop_loss[i] = data.close[0] - self.atr[i][0] * 2
+            else:
+                # hold_days = (data.datetime.date(0) - self.hold_pool.get_record(data._name).buy_date).days
+                if data.close[0] > self.high[i][-1] or data.close[0] < self.stop_loss[i]:
+                    print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
+                    self.order = self.sell(data)
+                    self.stop_loss[i] = 999999
+                    
+        self.query_holding_number()
+```
+
+
+```txt
+Final Portfolio Value: 135539.33
+Sharpe Ratio: OrderedDict([('sharperatio', 2.5370027147175715)])
+max Draw Down: AutoOrderedDict([('len', 185), ('drawdown', 8.865139268807953), ('moneydown', 11819.977088942804)])
+return: 7.318165583060822
+Annual Return: OrderedDict([(2020, 0.08582458338809618), (2021, 0.09086575369760341), (2022, 0.06548758830758517), (2023, 0.02289832387685542), (2024, 0.04991345505219824)])
 ```
 
 ## 6. xgboost regression
@@ -316,3 +374,75 @@ IC: 0.937778172586351
 ![xgboost](images/sp500_xgboost_regressor_pre10days.jpg)
 
 Absolutely crazy, the xgboost regressor with previous 10 days indicators can predict the future 30 days return with a IC of 0.9378, which is a very good result.
+
+## 7. turtle
+```python
+
+class TurtleTradingStrategy(StragegyTemplate):
+    params = (
+        ('ema_period', 20),
+        ('ema_long_period', 50),
+        ('atr_period', 14),
+        ('high_period', 60),
+        ('low_period', 20),
+        ('k_atr', 2),
+        ('max_stock_num', 50),
+        )
+
+    def __init__(self):
+        super().__init__()
+        self.ema = []
+        self.ema_long = []
+        self.atr = []
+        self.max_price = []
+        self.min_price = []
+        self.break_price = []
+        self.unit = []
+        self.atr_stop = []
+        self.pre_trade_price = [-1 for i in range(len(self.datas))]
+        
+        for i, data in enumerate(self.datas):
+            self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
+            self.ema_long.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_long_period))
+            self.atr.append(bt.indicators.ATR(data, period=self.params.atr_period))
+            self.max_price.append(bt.indicators.Highest(data.high, period=self.params.high_period))
+            self.min_price.append(bt.indicators.Lowest(data.low, period=self.params.low_period))
+            self.atr_stop.append(AverageTrueRangeStop(data, atr_period=self.params.atr_period, multiplier=self.params.k_atr, price_type='close'))
+            
+
+    def next(self):
+        if self.order:
+            return
+
+        for i, data in enumerate(self.datas):
+            if data.close[0] >= self.max_price[i][-1] and self.ema[i][-1] > self.ema_long[i][-1] and self.ema_long[i][-1] > self.ema_long[i][-2]:
+                account_value = self.broker.get_value() * (1.0 / self.params.max_stock_num)
+                buy_size = (account_value / data.close[0] // 100) * 100
+                
+                if buy_size < 100:
+                    buy_size = 100
+
+                if self.getposition(data).size <= 0:
+                    self.logger.info(f"{data.datetime.date(0)}: name : {data._name} buy , today close at {data.close[0]}   buy_size: {buy_size}")
+                    self.order = self.buy(data, size=buy_size)
+                    self.pre_trade_price[i] = data.close[0]
+                else:
+                    # the stock has been bought ,concider to add more
+                    if data.close[0] > self.pre_trade_price[i] + 0.5 * self.atr[i][0]:
+                        self.logger.info(f"{data.datetime.date(0)}: name : {data._name} add more , today close at {data.close[0]}   buy_size: {buy_size}")
+                        self.order = self.buy(data, size=buy_size)
+                        self.pre_trade_price[i] = data.close[0]
+
+            elif data.close[0] < self.pre_trade_price[i] - (self.params.k_atr * self.atr[i][0]) :
+                sell_size = self.getposition(data).size
+                self.order = self.sell(data, size=sell_size)
+                self.pre_trade_price[i] = -1
+                self.logger.info(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}   sell_size: {sell_size}")
+                
+        self.query_holding_number()
+```
+Final Portfolio Value: 232520.60
+Sharpe Ratio: OrderedDict([('sharperatio', 0.5752245889991618)])
+max Draw Down: AutoOrderedDict([('len', 673), ('drawdown', 31.476698890610102), ('moneydown', 88869.66865765705)])
+return: 21.650423136076196
+Annual Return: OrderedDict([(2020, 1.05754949314399), (2021, 0.2778871149185309), (2022, -0.2588573893284253), (2023, 0.09247404871171905), (2024, 0.0922089778009818)]).
