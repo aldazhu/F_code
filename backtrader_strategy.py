@@ -62,7 +62,21 @@ class MySeaData(btfeeds.GenericCSVData):
         # ('openinterest', -1)
     )
 
-
+class MyAKShareETFData(btfeeds.GenericCSVData):
+    params = (
+        ('fromdate', datetime.datetime(2018, 11, 1)),
+        ('todate', datetime.datetime(2025, 12, 31)),
+        ('dtformat', ('%Y-%m-%d')),
+        # ('tmformat', ('%H.%M.%S')),
+        ('datetime', 1),
+        # ('time', -1),
+        ('open', 2),
+        ('close', 3),
+        ('high', 4),
+        ('low', 5),
+        ('volume', 6),
+        # ('openinterest', -1)
+    )
 
 
 # https://www.backtrader.com/docu/quickstart/quickstart/#customizing-the-strategy-parameters
@@ -278,9 +292,10 @@ class StragegyTemplate(bt.Strategy):
     def query_holding_number(self):
         holding_number = len(self.hold_pool.pool)
         account_value = self.broker.get_value()
+        date = self.datas[0].datetime.date(0)
+
         self.change_percent = (account_value - self.broker.startingcash) / self.broker.startingcash
-        self.logger.info("account value: %s, change percent: %s", account_value, self.change_percent)
-        self.logger.info("Holding number: %s" % holding_number)
+        self.logger.info("date: %s, Holding number:%s, account value: %s, change percent: %s",date,holding_number ,account_value, self.change_percent)
 
     def stop_loss_watch_dog(self):
         for i, data in enumerate(self.datas):
@@ -1506,13 +1521,17 @@ class TurtleTradingStrategy(StragegyTemplate):
             self.max_price.append(bt.indicators.Highest(data.high, period=self.params.high_period))
             self.min_price.append(bt.indicators.Lowest(data.low, period=self.params.low_period))
             self.atr_stop.append(AverageTrueRangeStop(data, atr_period=self.params.atr_period, multiplier=self.params.k_atr, price_type='close'))
-            
+            if data._name == "000001.SZ" or data._name == "sh.000300":
+                self.with_index = True
+                self.stock_index_id = i
 
     def next(self):
         if self.order:
             return
 
         for i, data in enumerate(self.datas):
+            if self.with_index and i == self.stock_index_id:
+                continue
             if data.close[0] >= self.max_price[i][-1] and self.ema[i][-1] > self.ema_long[i][-1] and self.ema_long[i][-1] > self.ema_long[i][-2]:
                 account_value = self.broker.get_value() * (1.0 / self.params.max_stock_num)
                 buy_size = (account_value / data.close[0] // 100) * 100
@@ -1521,6 +1540,8 @@ class TurtleTradingStrategy(StragegyTemplate):
                     buy_size = 100
 
                 if self.getposition(data).size <= 0:
+                    if self.with_index and self.ema[self.stock_index_id][0] < self.ema_long[self.stock_index_id][0]:
+                        continue
                     self.logger.info(f"{data.datetime.date(0)}: name : {data._name} buy , today close at {data.close[0]}   buy_size: {buy_size}")
                     self.order = self.buy(data, size=buy_size)
                     self.pre_trade_price[i] = data.close[0]
