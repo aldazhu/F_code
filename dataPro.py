@@ -729,16 +729,17 @@ def DemoOfCluster():
         tool.drawOneSample(X[i],Y[i],True,image_save_path)
 
 def demo_of_datapro():
-    save_root = "./data_test"
+    save_root = "./data_index"
     dp = DataPro()
     dp.set_save_root(save_root)
-    stock_code = "sh.000300"
-    start_date = "2022-01-01"
+    # stock_code = "sh.000300"
+    stock_code = "sh.000001"
+    start_date = "2010-01-01"
     end_date = "2024-09-01"
     frequency = "d"
-    # dp.download_k_history(stock_code, start_date, end_date, frequency,mode="index")
+    dp.download_k_history(stock_code, start_date, end_date, frequency,mode="index")
     # dp.download_k_history(stock_code, start_date, end_date, frequency,mode="stock")
-    dp.download_all_hs300_stocks(start_date, end_date, frequency)
+    # dp.download_all_hs300_stocks(start_date, end_date, frequency)
     # dp.download_all_zh1000_stocks(start_date,end_date, frequency)
 
 

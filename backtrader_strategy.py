@@ -295,7 +295,8 @@ class StragegyTemplate(bt.Strategy):
         date = self.datas[0].datetime.date(0)
 
         self.change_percent = (account_value - self.broker.startingcash) / self.broker.startingcash
-        self.logger.info("date: %s, Holding number:%s, account value: %s, change percent: %s",date,holding_number ,account_value, self.change_percent)
+        current_cash = self.broker.get_cash()
+        self.logger.info("date: %s, Holding number:%s, account value: %s, cash:%s, change percent: %s",date,holding_number ,account_value,current_cash, self.change_percent)
 
     def stop_loss_watch_dog(self):
         for i, data in enumerate(self.datas):
@@ -479,13 +480,29 @@ class StragegyTemplate(bt.Strategy):
 
 
 class MovingAverageStrategy(StragegyTemplate):
-    params = (('ma_period', 15), ) # class variable , can be accessed by self.params.ma_period
+    params = (
+        ('ema_period_long', 60), 
+        ('ema_period_short', 20),
+        ('atr_period', 14),
+        ('unit_percent', 0.05), # 5% of the total account value
+        ) # class variable , can be accessed by self.params.ma_period
     def __init__(self):
         super().__init__()
-        self.ma = []
+        self.ema_long = []
+        self.ema_short = []
+        self.atr = []
+        self.pre_trade_price = [-1 for i in range(len(self.datas))]
+        self.with_index = False
+        self.stock_index_id = 0
         for i, data in enumerate(self.datas):
-            self.ma.append(bt.indicators.SimpleMovingAverage(data.close, period=self.params.ma_period))
-        
+            self.ema_long.append(bt.indicators.EMA(data.close, period=self.params.ema_period_long))
+            self.ema_short.append(bt.indicators.EMA(data.close, period=self.params.ema_period_short))
+            self.atr.append(bt.indicators.ATR(data, period=self.params.atr_period))
+            if data._name == "sh.000001" or data._name == "sh.000300":
+                self.with_index = True
+                self.stock_index_id = i
+                # input(f"stock index id: {self.stock_index_id}, stock index name: {data._name}")
+
     def next(self):
         # check if there is an unfinished order
         if self.order:
@@ -493,27 +510,59 @@ class MovingAverageStrategy(StragegyTemplate):
 
         # check if in the market
         for i, data in enumerate(self.datas):
-            if self.getposition(data).size <= 0:
+            # stop loss
+            if data.close[0] < self.pre_trade_price[i] - 2 * self.atr[i][0]:
+                self.order = self.sell(data, size=self.getposition(data).size)
+                self.pre_trade_price[i] = -1
+                continue
+
+
+            if data.close[0] > self.ema_long[i][0]:
+                buy_size = self.broker.get_cash() * self.params.unit_percent / data.close[0]
+                buy_size = int(buy_size / 100) * 100
+                if self.with_index  and self.datas[self.stock_index_id].close[0] < self.ema_long[self.stock_index_id][0]:
+                    continue
                 # if the closing price is above the moving average, buy
-                if data.close[0] > self.ma[i][0]:
-                    self.order = self.buy(data)
+                if self.getposition(data).size <= 0:
+                    self.order = self.buy(data, size=buy_size)
+                    self.pre_trade_price[i] = data.close[0]
+                else:
+                    if data.close[0] > self.pre_trade_price[i] + 0.6 * self.atr[i][0]:
+                        self.order = self.buy(data, size=buy_size)
+                        self.pre_trade_price[i] = data.close[0]
             else:
                 # if the closing price is below the moving average, sell
-                if data.close[0] < self.ma[i][0]:
-                    self.order = self.sell(data)
+                if data.close[0] < self.ema_short[i][0]:
+                    self.order = self.sell(data, size=self.getposition(data).size)
+                    self.pre_trade_price[i] = -1
+
+            
+
+            
         
 
 class RSIStrategy(StragegyTemplate):
-    params = (('rsi_period', 15), ('rsi_upper', 70), ('rsi_lower', 30),('high_period', 20),('stop_loss', 0.2))
+    params = (
+        ('rsi_period', 15), 
+        ('rsi_upper', 70), 
+        ('rsi_lower', 30),
+        ('high_period', 20),
+        ('stop_loss', 0.2),
+        ('unit_percent', 0.05),
+        ('atr_period', 14),
+        )
     def __init__(self):
         super().__init__()
         self.min_price = []
         self.rsi = []
         self.highest = []
+        self.atr = []
+        self.pre_trade_price = [-1 for i in range(len(self.datas))]
         for i, data in enumerate(self.datas):
             self.min_price.append(bt.indicators.Lowest(data.low, period=self.params.high_period))
             self.rsi.append(bt.indicators.RSI_Safe(data.close, period=self.params.rsi_period))
             self.highest.append(bt.indicators.Highest(data.high, period=self.params.high_period))
+            self.atr.append(bt.indicators.ATR(data, period=self.params.atr_period))
 
     def next(self):
         
@@ -523,12 +572,21 @@ class RSIStrategy(StragegyTemplate):
             return
 
         for i, data in enumerate(self.datas):
+            if data.close[0] < self.pre_trade_price[i] - 2.0 * self.atr[i][0]:
+                self.order = self.sell(data, size=self.getposition(data).size)
+                self.pre_trade_price[i] = -1
+                continue
+
             if self.getposition(data).size > 0:
                 if self.rsi[i][0] < self.params.rsi_upper and self.rsi[i][-1] >= self.params.rsi_upper:
-                    self.order = self.sell(data)
+                    self.order = self.sell(data, size=self.getposition(data).size)
+                    self.pre_trade_price[i] = -1
             else:
                 if self.rsi[i][0] > self.params.rsi_lower and self.rsi[i][-1] <= self.params.rsi_lower:
-                    self.order = self.buy(data)
+                    buy_size = self.broker.get_value() * self.params.unit_percent / data.close[0]
+                    buy_size = int(buy_size / 100) * 100
+                    self.order = self.buy(data, size=buy_size)
+                    self.pre_trade_price[i] = data.close[0]
         self.query_holding_number()
         
         
@@ -539,6 +597,7 @@ class CCIStrategy(StragegyTemplate):
               ('cci_lower', -150), 
               ('high_period', 20),
               ('atr_multiplier', 3),
+              ('unit_percent', 0.05),
               )
     def __init__(self):
         super().__init__()
@@ -548,6 +607,7 @@ class CCIStrategy(StragegyTemplate):
         self.stop_loss = [99999999 for i in range(len(self.datas))]
         self.ema = []
         self.cci_ema = []
+        self.pre_trade_price = [-1 for i in range(len(self.datas))]
         
         for i, data in enumerate(self.datas):
             print(f"data name: {data._name}, num: {i}")
@@ -568,17 +628,27 @@ class CCIStrategy(StragegyTemplate):
             return
 
         for i, data in enumerate(self.datas):
+
+            if data.close[0] < self.pre_trade_price[i] - 2.0 * self.atr[i][0]:
+                self.order = self.sell(data, size=self.getposition(data).size)
+                self.pre_trade_price[i] = -1
+                continue
             
             if self.getposition(data).size > 0:
                 if self.cci[i][0] < self.params.cci_upper and self.cci[i][-1] >= self.params.cci_upper:
-                    self.order = self.sell(data)
+                    self.order = self.sell(data, size=self.getposition(data).size)
+                    self.pre_trade_price[i] = -1
                 elif data.close[0] < self.stop_loss[i]:
-                    self.order = self.sell(data)
+                    self.order = self.sell(data, size=self.getposition(data).size)
+                    self.pre_trade_price[i] = -1
                     
                     self.stop_loss[i] = 99999999
             else:
                 if self.cci[i][0] > self.params.cci_lower and self.cci[i][-1] <= self.params.cci_lower:
-                    self.order = self.buy(data)
+                    buy_size = self.broker.get_value() * self.params.unit_percent / data.close[0]
+                    buy_size = int(buy_size / 100) * 100
+                    self.order = self.buy(data, size=buy_size)
+                    self.pre_trade_price[i] = data.close[0]
                     
                     self.stop_loss[i] = data.close[0] - self.atr[i][0] * self.params.atr_multiplier
 
@@ -783,7 +853,8 @@ class NewHighStrategy(StragegyTemplate):
         ('highest_window', 30),
         ('lowest_window', 15),
         ('ema_period', 30),
-        ('ema_sell_period', 10)
+        ('ema_sell_period', 10),
+        ('unit_percent', 0.05),
     )
 
     def __init__(self):
@@ -810,21 +881,21 @@ class NewHighStrategy(StragegyTemplate):
             return
 
         for i, data in enumerate(self.datas):
-            if self.getposition(data).size <= 0 :
-                if data.close[0] > self.high[i][-1] and self.diff[i][0] > 0 and self.rsi[i][0] > 50 and data.close[0] > self.ema[i][0] and self.ema[i][0] > self.ema[i][-1] and self.ema[i][-1] > self.ema[i][-2]:
+            
+            if data.close[0] > self.high[i][-1] and self.diff[i][0] > 0 and self.rsi[i][0] > 50 and data.close[0] > self.ema[i][0] and self.ema[i][0] > self.ema[i][-1] and self.ema[i][-1] > self.ema[i][-2]:
+                if self.getposition(data).size <= 0 :
                     # print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
-                    self.order = self.buy(data)
+                    buy_size = int(self.broker.get_value() * self.params.unit_percent / data.close[0] / 100) * 100
+                    self.order = self.buy(data, size=buy_size)
                     self.stop_loss[i] = data.close[0] - self.atr[i][0] * 2
             else:
                 
                 if data.close[0] < self.ema[i][0]  or data.close[0] < self.stop_loss[i]:
                     # print(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}")
-                    self.order = self.sell(data)
+                    self.order = self.sell(data, size=self.getposition(data).size)
                     self.stop_loss[i] = 999999
                 else:
-                    earning_ratio = (data.close[0] - self.hold_pool.get_record(data._name).buy_price) / self.hold_pool.get_record(data._name).buy_price
-                    if earning_ratio > 0.5:
-                        self.stop_loss[i] = data.high[0] - self.atr[i][0] * 2
+                    self.stop_loss[i] = max(self.stop_loss[i], data.close[0] - self.atr[i][0] * 3)
             
         # stop loss
         # self.stop_loss_watch_dog()
@@ -837,7 +908,8 @@ class NewLowStrategy(StragegyTemplate):
         ('lowest_window', 50),
         ('ema_period', 5),
         ('ema_sell_period', 10),
-        ('max_stock_num', 50)
+        # ('max_stock_num', 50),
+        ('unit_percent', 0.05),
     )
 
     def __init__(self):
@@ -864,7 +936,7 @@ class NewLowStrategy(StragegyTemplate):
             if self.getposition(data).size <= 0 :
                 if self.low[i][0] < self.low[i][-1] and data.close[0] > data.open[0] and data.close[0] > self.ema[i][0] :
                     print(f"{data.datetime.date(0)}: name : {data._name} buy , today coloe at {data.close[0]}")
-                    buy_amount = self.broker.get_value() / self.params.max_stock_num
+                    buy_amount = self.broker.get_value() * self.params.unit_percent
                     buy_size = int(buy_amount / data.close[0] / 100) * 100
                     self.order = self.buy(data, size=buy_size)
                     self.stop_loss[i] = data.close[0] - self.atr[i][0] * 2
@@ -1219,10 +1291,11 @@ class PriceMomumentStrategyForUS(StragegyTemplate):
 
 class EMATrendStrategy(StragegyTemplate):
     params = (
-        ('ema_period', 30),
-        ('ema_period2', 15),
+        ('ema_period', 60),
+        ('ema_period2', 30),
         ('atr_period', 14),
         ('atr_multiplier', 2.0),
+        ('unit_percent', 0.05),# 5% of the total value
     )
 
     def __init__(self):
@@ -1232,6 +1305,7 @@ class EMATrendStrategy(StragegyTemplate):
         self.atr_stop = []
         self.atr = []
         self.atr_normlized = []
+        self.pre_trade_price = [-1 for i in range(len(self.datas))]
         for i, data in enumerate(self.datas):
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
             self.ema2.append(bt.indicators.ExponentialMovingAverage(data.volume, period=self.params.ema_period2))
@@ -1243,15 +1317,22 @@ class EMATrendStrategy(StragegyTemplate):
             return
 
         for i, data in enumerate(self.datas):
-            if self.getposition(data).size <= 0:
-                if self.ema[i][0] >= self.ema[i][-1] and self.ema[i][-1] >= self.ema[i][-2] and self.ema2[i][0] > self.ema2[i][-1]:
-                    self.order = self.buy(data)
-            else:
-                # if data.close[0] < self.atr_stop[i]:
-                if self.ema[i][0] < self.ema[i][-1] and self.ema[i][-1] < self.ema[i][-2]:
-                    self.order = self.sell(data)
+            if self.ema[i][0] >= self.ema[i][-1] and self.ema[i][-1] >= self.ema[i][-2] and self.ema2[i][0] > self.ema2[i][-1]:
+                buy_size = int(self.broker.get_value() * self.params.unit_percent / data.close[0] / 100) * 100
+                if self.getposition(data).size <= 0:
+                    self.order = self.buy(data, size=buy_size)
+                    self.pre_trade_price[i] = data.close[0]
+                elif data.close[0] > self.pre_trade_price[i] + 0.5 * self.atr[i][0]:
+                    self.order = self.buy(data, size=buy_size)
+                    self.pre_trade_price[i] = data.close[0]
+            
+            elif data.close[0] < self.pre_trade_price[i] - 1 * self.atr[i][0]:
+                if self.getposition(data).size > 0:
+                    self.order = self.sell(data, size=self.getposition(data).size)
+                    self.pre_trade_price[i] = -1    
+            
         self.query_holding_number()
-        self.stop_loss_watch_dog()
+        
 
 
 
@@ -1499,7 +1580,7 @@ class TurtleTradingStrategy(StragegyTemplate):
         ('high_period', 60),
         ('low_period', 20),
         ('k_atr', 2),
-        ('max_stock_num', 50),
+        ('unit_percent', 0.02),
         )
 
     def __init__(self):
@@ -1533,18 +1614,27 @@ class TurtleTradingStrategy(StragegyTemplate):
             return
 
         for i, data in enumerate(self.datas):
-            if self.with_index and i == self.stock_index_id:
+            if data.close[0] < self.pre_trade_price[i] - (self.params.k_atr * self.atr[i][0]) :
+                sell_size = self.getposition(data).size
+                if sell_size <= 0:
+                    continue
+                self.order = self.sell(data, size=sell_size)
+                self.pre_trade_price[i] = -1
                 continue
+
+            
             if data.close[0] >= self.max_price[i][-1] and self.ema[i][-1] > self.ema_long[i][-1] and self.ema_long[i][-1] > self.ema_long[i][-2]:
-                account_value = self.broker.get_value() * (1.0 / self.params.max_stock_num)
+                account_value = self.broker.get_value() * self.params.unit_percent
                 buy_size = (account_value / data.close[0] // 100) * 100
                 
                 if buy_size < 100:
                     buy_size = 100
 
+                if self.with_index and self.datas[self.stock_index_id].close[0] < self.ema_long[self.stock_index_id][0]:
+                    continue
+
                 if self.getposition(data).size <= 0:
-                    if self.with_index and self.ema[self.stock_index_id][0] < self.ema_long[self.stock_index_id][0]:
-                        continue
+                    
                     self.logger.info(f"{data.datetime.date(0)}: name : {data._name} buy , today close at {data.close[0]}   buy_size: {buy_size}")
                     self.order = self.buy(data, size=buy_size)
                     self.pre_trade_price[i] = data.close[0]
@@ -1555,59 +1645,87 @@ class TurtleTradingStrategy(StragegyTemplate):
                         self.order = self.buy(data, size=buy_size)
                         self.pre_trade_price[i] = data.close[0]
 
-            elif data.close[0] < self.pre_trade_price[i] - (self.params.k_atr * self.atr[i][0]) :
-                sell_size = self.getposition(data).size
-                if sell_size <= 0:
-                    continue
-                self.order = self.sell(data, size=sell_size)
-                self.pre_trade_price[i] = -1
-                self.logger.info(f"{data.datetime.date(0)}: name : {data._name} sell , today close at {data.close[0]}   sell_size: {sell_size}")
-                
         self.query_holding_number()
 
 class GridTradingStrategy(StragegyTemplate):
     params = (
         ('grid_size', 0.02),
         ('grid_num', 10),
-        ('hold_days', 10),
-        ('short_period', 10),
         ('long_period', 30),
+        ('atr_period', 14),
+        ('unit_percent', 0.05),
     )
 
     def __init__(self):
         super().__init__()
         self.grid = []
-        self.buy_signals = []
-        self.sell_signals = []
-        self.hold_days = self.params.hold_days
+        self.ema_long = []
+        self.highest_price = []
+        self.lowest_price = []
+        self.atr = []
+        self.pre_trade_price = [-1 for i in range(len(self.datas))]
+
+        self.with_index = False
+        self.stock_index_id = 0
+        self.failed_times = [0 for i in range(len(self.datas))]
 
         for i, data in enumerate(self.datas):
             self.grid.append(0)
-            self.buy_signals.append(False)
-            self.sell_signals.append(False)
-            self.short_ma = bt.indicators.SimpleMovingAverage(data.close, period=self.params.short_period)
-            self.long_ma = bt.indicators.SimpleMovingAverage(data.close, period=self.params.long_period)
+                        
+            self.ema_long.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.long_period))
+            self.atr.append(bt.indicators.ATR(data, period=self.params.atr_period))
+            self.highest_price.append(bt.indicators.Highest(data.high, period=self.params.atr_period))
+            self.lowest_price.append(bt.indicators.Lowest(data.low, period=self.params.atr_period))
+            if data._name == "sh.000001" or data._name == "sh.000300":
+                self.with_index = True
+                self.stock_index_id = i
 
     def next(self):
+        if self.order:
+            return
+
         for i, data in enumerate(self.datas):
-            if self.short_ma[i] > self.long_ma[i]:
-                self.buy_signals[i] = True
-                self.sell_signals[i] = False
-            elif self.short_ma[i] < self.long_ma[i]:
-                self.buy_signals[i] = False
-                self.sell_signals[i] = True
+            if data._name == "sh.000001" or data._name == "sh.000300":
+                continue
+            # Check if we already hold a position on this data feed
+            if self.getposition(data).size:
+                # if data.close[0] < self.ema_long[i][0] and self.getposition(data).size > 0:
+                #     self.sell(data=data, size=self.getposition(data).size)
+                #     self.pre_trade_price[i] = -1
+                #     self.failed_times[i] = 0
+                #     self.grid[i] = 0
+                #     continue
 
-            if self.buy_signals[i]:
-                self.grid[i] += 1
-                if self.grid[i] <= self.params.grid_num:
-                    self.buy(data, size=self.params.grid_size)
-                    self.logger.info(f"BUY {data._name} at {data.close[0]}")
+                # We might consider selling if the current price is higher than the highest price
+                if data.close[0] > self.pre_trade_price[i] + self.atr[i][0]:
+                    sell_size = int(self.broker.get_value() * self.params.unit_percent / data.close[0] / 100) * 100
+                    
+                    sell_size = sell_size if self.failed_times[i] == 0 else sell_size * self.failed_times[i]
+                    self.failed_times[i] -= 1
+                    if self.failed_times[i] < 0:
+                        self.failed_times[i] = 0
 
-            if self.sell_signals[i]:
-                self.grid[i] -= 1
-                if self.grid[i] >= -self.params.grid_num:
-                    self.sell(data, size=self.params.grid_size)
-                    self.logger.info(f"SELL {data._name} at {data.close[0]}")
+                    sell_size = min(sell_size, self.getposition(data).size)
+                    self.sell(data=data, size=sell_size)
+                    self.pre_trade_price[i] = data.close[0]
+                    self.grid[i] = 0
+                # We might consider buying more if the current price is lower than the lowest price
+                elif data.close[0] < self.pre_trade_price[i] - self.atr[i][0]:
+                    buy_size = int(self.broker.get_value() * self.params.unit_percent / data.close[0] / 100) * 100
+                    self.failed_times[i] += 1
+                    buy_size = self.failed_times[i] * buy_size
+                    self.buy(data=data, size=buy_size)
+                    self.pre_trade_price[i] = data.close[0]
+                    self.grid[i] += 1
+            else:
+                if self.with_index and self.datas[self.stock_index_id].close[0] < self.ema_long[self.stock_index_id][0]:
+                    continue
+                # We don't hold a position, consider entering the market
+                if data.close[0] > self.ema_long[0]:
+                    buy_size = int(self.broker.get_value() * self.params.unit_percent / data.close[0] / 100) * 100
+                    self.buy(data=data,size=buy_size)
+                    self.pre_trade_price[i] = data.close[0]
+                    self.grid[i] += 1
 
         self.query_holding_number()
 
@@ -1965,8 +2083,8 @@ class KalmanFilterStrategyRank(StragegyTemplate):
         ('ema_period', 30),
         ('long_ema_period', 60),
         ('k_atr', 2),
-        ('max_stock_num', 50),
-        ('top_k', 30),
+        ('unit_percent', 0.1),
+        ('top_k', 10),
         )
 
     def __init__(self):
@@ -1982,24 +2100,38 @@ class KalmanFilterStrategyRank(StragegyTemplate):
         self.pre_trade_price = [-1 for i in range(len(self.datas))]
         self.kalman_filter = []
 
+        ################state dim = 3
         # x = [ema, ema_v, ema_a]
         # ema_y = ema + ema_v * dt + 0.5 * ema_a * dt * dt 
+        # F = np.array([
+        #     [1, 1, 0.5],
+        #     [0, 1, 1],
+        #     [0, 0, 1],
+        # ])
+        # x = np.array([[0], [0], [0]])
+        # H = np.array([[1, 0, 0]])
+        # state_dim = 3
+
+        ################state dim = 2
+        # x = [ema, ema_v]
+        # ema_y = ema + ema_v * dt
         F = np.array([
-            [1, 1, 0.5],
-            [0, 1, 1],
-            [0, 0, 1],
+            [1, 1],
+            [0, 1],
         ])
-        x = np.array([[0], [0], [0]])
-        H = np.array([[1, 0, 0]])
+        x = np.array([[0], [0]])
+        H = np.array([[1, 0]])
+        state_dim = 2
+
         
         # dict_t = {"pred":[],
         #           "truth":[]}
         self.predict_state = []
 
         for i, data in enumerate(self.datas):
-            Q = np.eye(3) * 0.1 # Process noise covariance
+            Q = np.eye(state_dim) * 0.01 # Process noise covariance
             R = np.eye(1) * 1 # Observation noise covariance
-            P = np.eye(3) * self.datas[i].close[0] # Initial state covariance
+            P = np.eye(state_dim) * self.datas[i].close[0] # Initial state covariance
 
             self.kalman_filter.append(KalmanFilter(x, F, H, Q, R, P))
             self.ema.append(bt.indicators.ExponentialMovingAverage(data.close, period=self.params.ema_period))
@@ -2042,7 +2174,7 @@ class KalmanFilterStrategyRank(StragegyTemplate):
             
             # Predict the next 10 days
             predictions = []
-            for _ in range(10):
+            for _ in range(3):
                 self.kalman_filter[i].predict()
                 predictions.append(self.kalman_filter[i].x[0])
 
@@ -2061,7 +2193,7 @@ class KalmanFilterStrategyRank(StragegyTemplate):
             data_index = predictions_per_stock[i][0]
             prediction = predictions_per_stock[i][1]
             data = self.datas[data_index]
-            account_value = self.broker.get_value() * (1.0 / self.params.max_stock_num)
+            account_value = self.broker.get_value() * self.params.unit_percent
             buy_size = (account_value / data.close[0] // 100) * 100
             
             if prediction > 0.008 and data.close[0] > self.ema_long[data_index][0]:
@@ -2072,10 +2204,10 @@ class KalmanFilterStrategyRank(StragegyTemplate):
                 #     if data.close[0] > self.pre_trade_price[data_index] + 0.5 * self.atr[data_index][0]:
                 #         self.buy(data, size=buy_size)
                 #         self.pre_trade_price[data_index] = data.close[0]
-            elif prediction < -0.01:
-                if self.getposition(data).size > 0:
-                    self.sell(data, size=self.getposition(data).size)
-                    self.pre_trade_price[data_index] = -1
+            # elif prediction < -0.01:
+            #     if self.getposition(data).size > 0:
+            #         self.sell(data, size=self.getposition(data).size)
+            #         self.pre_trade_price[data_index] = -1
             # elif data.close[0] < self.pre_trade_price[data_index] - 1.0 * self.atr[data_index][0] :
             #     if self.getposition(data).size > 0:
             #         self.sell(data, size=self.getposition(data).size)
